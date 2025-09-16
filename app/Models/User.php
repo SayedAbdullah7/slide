@@ -1,0 +1,95 @@
+<?php
+
+namespace App\Models;
+
+// use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
+
+class User extends Authenticatable
+{
+    /** @use HasFactory<\Database\Factories\UserFactory> */
+    use HasFactory, Notifiable;
+    use HasApiTokens;
+
+    public const PROFILE_INVESTOR = 'investor';
+    public const PROFILE_OWNER = 'owner';
+    public const PROFILE_TYPES = [self::PROFILE_INVESTOR, self::PROFILE_OWNER];
+
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var list<string>
+     */
+    protected $fillable = [
+        'full_name',
+        'phone',
+        'email',
+        'national_id',
+        'birth_date',
+        'password',
+        'is_active',
+        'is_registered',
+    ];
+
+    /**
+     * The attributes that should be hidden for serialization.
+     *
+     * @var list<string>
+     */
+    protected $hidden = [
+        'password',
+        'remember_token',
+    ];
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'email_verified_at' => 'datetime',
+            'password' => 'hashed',
+        ];
+    }
+
+
+    public function hasPassword(): bool
+    {
+        return !empty($this->password);
+    }
+
+
+    public function investorProfile(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(InvestorProfile::class);
+    }
+
+    public function ownerProfile(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(OwnerProfile::class);
+    }
+
+    public function hasInvestor(): bool
+    {
+        return $this->investorProfile()->exists();
+    }
+
+    public function hasOwner(): bool
+    {
+        return $this->ownerProfile()->exists();
+    }
+
+    public function activeProfile(): mixed
+    {
+        return match ($this->active_profile_type) {
+            self::PROFILE_INVESTOR => $this->investorProfile,
+            self::PROFILE_OWNER => $this->ownerProfile,
+            default => null,
+        };
+    }
+}
