@@ -14,6 +14,10 @@ class InvestmentOpportunitySeeder extends Seeder
      */
     public function run(): void
     {
+        if(InvestmentOpportunity::count() > 0) {
+            $this->command->warn('InvestmentOpportunities already seeded.');
+            return;
+        }
         $descriptions = [
             // قصيرة
             'فرصة استثمارية تحقق عوائد مجزية.',
@@ -57,8 +61,9 @@ class InvestmentOpportunitySeeder extends Seeder
         // التأكد من وجود بيانات التصنيفات وأصحاب المشاريع
         $categories = InvestmentCategory::all();
         $owners = OwnerProfile::all();
+
         // drop old data if exists
-        InvestmentOpportunity::whereNotNull('id')->delete();
+        // InvestmentOpportunity::whereNotNull('id')->delete();
 
         if ($categories->isEmpty() || $owners->isEmpty()) {
             $this->command->warn('Please seed InvestmentCategory and OwnerProfile before running this seeder.');
@@ -80,21 +85,27 @@ class InvestmentOpportunitySeeder extends Seeder
             return;
         }
 
-        for ($i = 0; $i < 20; $i++) {
-            $targetAmount = $faker->randomFloat(2, 100000, 1000000);
-            $pricePerShare = $faker->randomFloat(2, 100, 1000);
+        // Increase number of records to 50
+        for ($i = 0; $i < 50; $i++) {
+            $targetAmount = $faker->randomFloat(2, 100000, 2000000);
+            $pricePerShare = $faker->randomFloat(2, 100, 2000);
             $totalShares = floor($targetAmount / $pricePerShare);
             $reservedShares = $faker->numberBetween(0, $totalShares);
 
-            $offeringStart = $faker->dateTimeBetween('-3 months', 'now');
-            $offeringEnd = (clone $offeringStart)->modify('+'.rand(1, 6).' months');
-            $showDate = $faker->dateTimeBetween('-2 months', 'now');
+            $offeringStart = $faker->dateTimeBetween('-6 months', 'now');
+            $offeringEnd = (clone $offeringStart)->modify('+' . rand(1, 12) . ' months');
+            $showDate = $faker->dateTimeBetween('-3 months', 'now');
+            $profitDistributionDate = (clone $offeringEnd)->modify('+' . rand(6, 24) . ' months');
+
+            // Calculate expected returns based on price per share
+            $expectedReturnByMyself = $pricePerShare * $faker->randomFloat(2, 0.15, 0.35); // 15-35% return
+            $expectedNetReturnByMyself = $expectedReturnByMyself * $faker->randomFloat(2, 0.7, 0.9); // 70-90% of gross return
+            $expectedReturnByAuthorize = $pricePerShare * $faker->randomFloat(2, 0.20, 0.40); // 20-40% return
+            $expectedNetReturnByAuthorize = $expectedReturnByAuthorize * $faker->randomFloat(2, 0.6, 0.8); // 60-80% of gross return
 
             $opportunity = InvestmentOpportunity::create([
-//                'name' => $faker->company . ' Project',
                 'name' => 'مشروع ' . $faker->company,
                 'location' => $faker->city,
-//                'description' => $faker->paragraphs(3, true),
                 'description' => $faker->randomElement($descriptions),
                 'category_id' => $categories->random()->id,
                 'owner_profile_id' => $owners->random()->id,
@@ -103,9 +114,12 @@ class InvestmentOpportunitySeeder extends Seeder
                 'target_amount' => $targetAmount,
                 'price_per_share' => $pricePerShare,
                 'reserved_shares' => $reservedShares,
+                'shipping_and_service_fee' => $faker->randomFloat(2, 5, 20),
                 'investment_duration' => $faker->numberBetween(6, 60),
-                'expected_return_amount' => $faker->randomFloat(2, 5000, 50000),
-                'expected_net_return' => $faker->randomFloat(2, 2000, 40000),
+                'expected_return_amount_by_myself' => $expectedReturnByMyself,
+                'expected_net_return_by_myself' => $expectedNetReturnByMyself,
+                'expected_return_amount_by_authorize' => $expectedReturnByAuthorize,
+                'expected_net_return_by_authorize' => $expectedNetReturnByAuthorize,
                 'min_investment' => $faker->randomFloat(2, 100, 1000),
                 'max_investment' => $faker->randomFloat(2, 10000, 100000),
                 'fund_goal' => $faker->randomElement(['growth', 'stability', 'income']),
@@ -113,6 +127,7 @@ class InvestmentOpportunitySeeder extends Seeder
                 'show_date' => $showDate,
                 'offering_start_date' => $offeringStart,
                 'offering_end_date' => $offeringEnd,
+                'profit_distribution_date' => $profitDistributionDate,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
@@ -121,12 +136,19 @@ class InvestmentOpportunitySeeder extends Seeder
             $opportunity->addMedia($termsPath)->preservingOriginal()->toMediaCollection('terms');
             $opportunity->addMedia($summaryPath)->preservingOriginal()->toMediaCollection('summary');
 
-            // صورة غلاف عشوائية من المجلد
-            $coverPath = $this->getRandomImageFromFolder($coversFolder);
-            $opportunity->addMedia($coverPath)->preservingOriginal()->toMediaCollection('cover');
+            // صور غلاف عشوائية من المجلد
+            // add from 2 to 5 images
+            for ($x = 0; $x < $faker->numberBetween(2, 5); $x++) {
+                $coverPath = $this->getRandomImageFromFolder($coversFolder);
+                $opportunity->addMedia($coverPath)->preservingOriginal()->toMediaCollection('cover');
+            }
+            //         $coverPath = $this->getRandomImageFromFolder($coversFolder);
+            //         $opportunity->addMedia($coverPath)->preservingOriginal()->toMediaCollection('cover');
+            // }
+            $this->command->info('✅ Seeded investment opportunity ' . $opportunity->name . ' number ' . $i);
         }
 
-        $this->command->info('✅ Seeded 20 investment opportunities with media files.');
+        $this->command->info('✅ Seeded 50 investment opportunities with media files.');
     }
 
     /**

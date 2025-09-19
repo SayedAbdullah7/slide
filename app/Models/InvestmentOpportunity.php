@@ -96,29 +96,37 @@ class InvestmentOpportunity extends Model implements HasMedia
         'price_per_share',
         'reserved_shares',
         'investment_duration',
-        'expected_return_amount',
-        'expected_net_return',
-        'min_investment',
-        'max_investment',
+        'expected_return_amount_by_myself',
+        'expected_net_return_by_myself',
+        'expected_return_amount_by_authorize',
+        'expected_net_return_by_authorize',
+        'shipping_and_service_fee',
+        'min_investment',  // min investment shares for one user
+        'max_investment',  // max investment shares for one user
         'fund_goal',
         'show',
         'show_date',
         'offering_start_date',
         'offering_end_date',
+        'profit_distribution_date',
     ];
 
     protected $casts = [
         'target_amount' => 'decimal:2',
         'price_per_share' => 'decimal:2',
-        'expected_return_amount' => 'decimal:2',
-        'expected_net_return' => 'decimal:2',
-        'min_investment' => 'decimal:2',
-        'max_investment' => 'decimal:2',
+        'expected_return_amount_by_myself' => 'decimal:2',
+        'expected_net_return_by_myself' => 'decimal:2',
+        'expected_return_amount_by_authorize' => 'decimal:2',
+        'expected_net_return_by_authorize' => 'decimal:2',
+        'shipping_and_service_fee' => 'decimal:2',
+        'min_investment' => 'integer',
+        'max_investment' => 'integer',
         'fund_goal' => 'string',
         'show' => 'boolean',
         'show_date' => 'datetime',
         'offering_start_date' => 'datetime',
         'offering_end_date' => 'datetime',
+        'profit_distribution_date' => 'datetime',
     ];
 
 
@@ -149,7 +157,7 @@ class InvestmentOpportunity extends Model implements HasMedia
 
     public function investments()
     {
-        return $this->hasMany(Investment::class);
+        return $this->hasMany(Investment::class, 'opportunity_id');
     }
 
 
@@ -188,6 +196,80 @@ class InvestmentOpportunity extends Model implements HasMedia
     public function scopeActiveAndVisible($query)
     {
         return $query->visible()->open();
+    }
+
+    /**
+     * Filter opportunities that are coming (future start date)
+     */
+    public function scopeComing($query)
+    {
+        return $query->where('status', 'open')
+            ->where('show', true)
+            ->where('offering_start_date', '>', now());
+    }
+
+    /**
+     * Filter opportunities owned by a specific user
+     */
+    public function scopeOwnedBy($query, $userId)
+    {
+        return $query->whereHas('ownerProfile', function ($q) use ($userId) {
+            $q->where('user_id', $userId);
+        });
+    }
+
+    /**
+     * Filter closed opportunities (completed or expired)
+     */
+    public function scopeClosed($query)
+    {
+        return $query->where(function ($q) {
+            $q->where('status', 'completed')
+                ->orWhere(function ($subQ) {
+                    $subQ->where('offering_end_date', '<', now())
+                        ->where('status', 'open');
+                });
+        });
+    }
+
+    /**
+     * Filter opportunities by status
+     */
+    public function scopeStatus($query, $status)
+    {
+        return $query->where('status', $status);
+    }
+
+    /**
+     * Filter opportunities by category
+     */
+    public function scopeCategory($query, $categoryId)
+    {
+        return $query->where('category_id', $categoryId);
+    }
+
+    /**
+     * Filter opportunities by risk level
+     */
+    public function scopeRiskLevel($query, $riskLevel)
+    {
+        return $query->where('risk_level', $riskLevel);
+    }
+
+    /**
+     * Filter opportunities within investment amount range
+     */
+    public function scopeInvestmentRange($query, $minAmount = null, $maxAmount = null)
+    {
+        if ($minAmount !== null) {
+            $query->where('min_investment', '>=', $minAmount);
+        }
+
+        if ($maxAmount !== null) {
+            $query->where('max_investment', '<=', $maxAmount);
+        }
+
+        return $query;
     }
 
 
@@ -267,8 +349,140 @@ class InvestmentOpportunity extends Model implements HasMedia
 
         $this
             ->addMediaCollection('cover')
-            ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp'])
-            ->singleFile();
+            ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp']);
     }
+
+    // ---------------------------------------------
+    // Percentage Calculation Methods (Per Share)
+    // ---------------------------------------------
+
+    /**
+     * Calculate expected return amount percentage per share for myself (direct investment)
+     */
+    public function expectedReturnAmountByMyselfPercentage(): float
+    {
+        if (
+            !$this->expected_return_amount_by_myself ||
+            !$this->price_per_share ||
+            $this->price_per_share <= 0
+        ) {
+            return 0;
+        }
+
+        return round(($this->expected_return_amount_by_myself / $this->price_per_share) * 100, 2);
+    }
+
+    /**
+     * Calculate expected net return percentage per share for myself (direct investment)
+     */
+    public function expectedNetReturnByMyselfPercentage(): float
+    {
+        if (
+            !$this->expected_net_return_by_myself ||
+            !$this->price_per_share ||
+            $this->price_per_share <= 0
+        ) {
+            return 0;
+        }
+
+        return round(($this->expected_net_return_by_myself / $this->price_per_share) * 100, 2);
+    }
+
+    /**
+     * Calculate expected return amount percentage per share for authorized investments
+     */
+    public function expectedReturnAmountByAuthorizePercentage(): float
+    {
+        if (
+            !$this->expected_return_amount_by_authorize ||
+            !$this->price_per_share ||
+            $this->price_per_share <= 0
+        ) {
+            return 0;
+        }
+
+        return round(($this->expected_return_amount_by_authorize / $this->price_per_share) * 100, 2);
+    }
+
+    /**
+     * Calculate expected net return percentage per share for authorized investments
+     */
+    public function expectedNetReturnByAuthorizePercentage(): float
+    {
+        if (
+            !$this->expected_net_return_by_authorize ||
+            !$this->price_per_share ||
+            $this->price_per_share <= 0
+        ) {
+            return 0;
+        }
+
+        return round(($this->expected_net_return_by_authorize / $this->price_per_share) * 100, 2);
+    }
+
+    /**
+     * Calculate shipping and service fee percentage per share
+     */
+    public function shippingDeliveryCostPercentage(): float
+    {
+        if (
+            !$this->shipping_and_service_fee ||
+            !$this->price_per_share ||
+            $this->price_per_share <= 0
+        ) {
+            return 0;
+        }
+
+        return round(($this->shipping_and_service_fee / $this->price_per_share) * 100, 2);
+    }
+
+    // ---------------------------------------------
+    // Guarantee Methods
+    // ---------------------------------------------
+
+    /**
+     * Get total guarantee value
+     */
+    public function getTotalGuaranteeValueAttribute(): float
+    {
+        return $this->guarantees->sum('value') ?? 0;
+    }
+
+    /**
+     * Get verified guarantees only
+     */
+    public function getVerifiedGuaranteesAttribute()
+    {
+        return $this->guarantees->where('is_verified', true);
+    }
+
+    /**
+     * Check if opportunity has any guarantees
+     */
+    public function hasGuarantees(): bool
+    {
+        return $this->guarantees()->exists();
+    }
+
+    /**
+     * Check if opportunity has verified guarantees
+     */
+    public function hasVerifiedGuarantees(): bool
+    {
+        return $this->guarantees()->verified()->exists();
+    }
+
+    /**
+     * Get guarantee coverage percentage (total guarantee value vs target amount)
+     */
+    public function getGuaranteeCoveragePercentageAttribute(): float
+    {
+        if (!$this->target_amount || $this->target_amount <= 0) {
+            return 0;
+        }
+
+        return round(($this->total_guarantee_value / $this->target_amount) * 100, 2);
+    }
+
 
 }

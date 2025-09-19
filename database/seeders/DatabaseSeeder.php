@@ -21,10 +21,11 @@ class DatabaseSeeder extends Seeder
 //        ]);
         $this->call([
             // Add your other seeders here
-            // Example: UserSeeder::class,
+            UserSeeder::class,
             SurveyQuestionSeeder::class,
             InvestmentCategorySeeder::class,
             InvestmentOpportunitySeeder::class,
+            InvestmentSeeder::class,
 //            SurveyOptionSeeder::class,
 //            SurveyAnswerSeeder::class,
         ]);

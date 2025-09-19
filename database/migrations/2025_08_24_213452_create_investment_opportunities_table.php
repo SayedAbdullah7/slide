@@ -34,8 +34,13 @@ return new class extends Migration
             $table->integer('reserved_shares')->default(0);
             $table->integer('investment_duration')->nullable();
 
-            $table->decimal('expected_return_amount', 15, 2)->nullable();
-            $table->decimal('expected_net_return', 15, 2)->nullable();
+            // $table->decimal('expected_return_amount', 15, 2)->nullable();
+            // $table->decimal('expected_net_return', 15, 2)->nullable();
+            $table->decimal('expected_return_amount_by_myself', 15, 2)->nullable(); // return amount for one share by myself
+            $table->decimal('expected_net_return_by_myself', 15, 2)->nullable();  // net return amount for one share by myself
+            $table->decimal('expected_return_amount_by_authorize', 15, 2)->nullable(); // return amount for one share by authorize
+            $table->decimal('expected_net_return_by_authorize', 15, 2)->nullable();  // net return amount for one share by authorize
+            $table->decimal('shipping_and_service_fee', 10, 2)->nullable(); // shipping_and_service_fee per share
             $table->decimal('min_investment', 10, 2)->default(0);
             $table->decimal('max_investment', 10, 2)->nullable();
 
@@ -45,6 +50,7 @@ return new class extends Migration
             $table->dateTime('show_date')->nullable();
             $table->dateTime('offering_start_date')->nullable();
             $table->dateTime('offering_end_date')->nullable();
+            $table->dateTime('profit_distribution_date')->nullable();
 
             $table->timestamps();
             $table->softDeletes();

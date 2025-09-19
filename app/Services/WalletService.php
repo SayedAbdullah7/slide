@@ -150,7 +150,7 @@ class WalletService
      */
     public function getWalletBalance($wallet): float
     {
-        return $wallet->balance;
+        return $wallet->balance ?? 0.0;
     }
 
     /**

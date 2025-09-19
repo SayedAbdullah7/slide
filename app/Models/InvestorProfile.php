@@ -32,4 +32,26 @@ class InvestorProfile extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function investments()
+    {
+        return $this->hasMany(Investment::class, 'investor_id');
+    }
+
+    /**
+     * Check if investor has wallet functionality
+     * التحقق من وجود وظائف المحفظة للمستثمر
+     */
+    public function hasWallet(): bool
+    {
+        return method_exists($this, 'balance');
+    }
+
+    /**
+     * Get wallet balance if available
+     * الحصول على رصيد المحفظة إذا كان متاحاً
+     */
+    public function getWalletBalance(): float
+    {
+        return $this->hasWallet() ? $this->balance : 0.0;
+    }
 }
