@@ -5,10 +5,10 @@ namespace App\DataTables\Custom;
 use Illuminate\Database\Eloquent\Builder;
 use Yajra\DataTables\Facades\DataTables;
 
-abstract class  BaseDataTable
+abstract class BaseDataTable
 {
     /**
-     * Define searchable relations (relation => column).
+     * Define searchable relations (relation => columns).
      */
     protected array $searchableRelations = [];
 
@@ -16,6 +16,11 @@ abstract class  BaseDataTable
      * Define columns for DataTable.
      */
     protected array $columns = [];
+
+    /**
+     * Define filters for DataTable.
+     */
+    protected array $filters = [];
 
     /**
      * Returns an array of columns for the DataTable.

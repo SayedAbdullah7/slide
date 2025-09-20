@@ -24,34 +24,36 @@ class UserDataTable extends BaseDataTable
     public function columns(): array
     {
         return [
-            Column::create('id'),
-            Column::create('full_name'),
+            Column::create('id')->setOrderable(false),
+            Column::create('full_name')->setTitle('Full Name'),
             Column::create('phone'),
-            Column::create('phone_verified_at'),
-            Column::create('national_id')->setTitle('National ID'),
-            Column::create('is_active'),
-            // Column::create('is_registered'),
-            Column::create('birth_date'),
             Column::create('email'),
-            // Column::create('email_verified_at'),
-            // Column::create('password'),
-            Column::create('active_profile_type'),
-            // Column::create('remember_token'),
-            Column::create('created_at'),
-            Column::create('updated_at'),
-            Column::create('action'),
+            Column::create('national_id')->setTitle('National ID'),
+            Column::create('birth_date')->setTitle('Birth Date'),
+            Column::create('is_active')->setTitle('Status'),
+            Column::create('active_profile_type')->setTitle('Profile Type'),
+            Column::create('created_at')->setTitle('Created'),
+            Column::create('action')->setTitle('Actions')->setSearchable(false)->setOrderable(false),
         ];
     }
 
-        /**
+    /**
      * Get the filters for the DataTable.
      *
      * @return array
      */
-    public function filters()
+    public function filters(): array
     {
         return [
-            'created_at' => Filter::date('Created Date','now'),
+            'created_at' => Filter::date('Created Date', 'today'),
+            'is_active' => Filter::select('Status', [
+                '1' => 'Active',
+                '0' => 'Inactive'
+            ]),
+            'active_profile_type' => Filter::select('Profile Type', [
+                'investor' => 'Investor',
+                'owner' => 'Owner'
+            ]),
         ];
     }
 
@@ -62,19 +64,53 @@ class UserDataTable extends BaseDataTable
      */
     public function handle()
     {
-        $query = User::query();
+        $query = User::with(['investorProfile', 'ownerProfile']);
 
         return DataTables::of($query)
             ->addColumn('action', function ($model) {
-                return view('pages.user.columns._actions', compact('model'));
+                return view('pages.user.columns._actions', compact('model'))->render();
+            })
+            ->editColumn('is_active', function ($model) {
+                return $model->is_active
+                    ? '<span class="badge badge-success">Active</span>'
+                    : '<span class="badge badge-danger">Inactive</span>';
+            })
+            ->editColumn('active_profile_type', function ($model) {
+                if (!$model->active_profile_type) {
+                    return '<span class="badge badge-secondary">No Profile</span>';
+                }
+
+                return match ($model->active_profile_type) {
+                    'investor' => '<span class="badge badge-primary">Investor</span>',
+                    'owner' => '<span class="badge badge-info">Owner</span>',
+                    default => '<span class="badge badge-secondary">Unknown</span>',
+                };
+            })
+            ->editColumn('birth_date', function ($model) {
+                return $model->birth_date?->format('Y-m-d') ?? 'N/A';
             })
             ->editColumn('created_at', function ($model) {
                 return $model->created_at->format('Y-m-d H:i:s');
             })
-            ->editColumn('updated_at', function ($model) {
-                return $model->updated_at->format('Y-m-d H:i:s');
+            ->filter(function ($query) {
+                $this->applySearch($query);
+
+                // Apply filters
+                $filters = request()->input('filters', []);
+
+                if (!empty($filters['is_active'])) {
+                    $query->where('is_active', $filters['is_active']);
+                }
+
+                if (!empty($filters['active_profile_type'])) {
+                    $query->where('active_profile_type', $filters['active_profile_type']);
+                }
+
+                if (!empty($filters['created_at'])) {
+                    $query->whereDate('created_at', $filters['created_at']);
+                }
             })
-            ->filter(fn ($query) => $this->applySearch($query))
+            ->rawColumns(['action', 'is_active', 'active_profile_type'])
             ->make(true);
     }
 }
