@@ -16,7 +16,7 @@ class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
     {
         // Telescope::night();
 
-//        $this->hideSensitiveRequestDetails();
+        // $this->hideSensitiveRequestDetails();
 
         $isLocal = $this->app->environment('local');
 
@@ -35,17 +35,19 @@ class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
      */
     protected function hideSensitiveRequestDetails(): void
     {
+        // Only hide sensitive data in production environments
+        return;
         if ($this->app->environment('local')) {
             return;
         }
 
-//        Telescope::hideRequestParameters(['_token']);
+        Telescope::hideRequestParameters(['_token']);
 
-//        Telescope::hideRequestHeaders([
-//            'cookie',
-//            'x-csrf-token',
-//            'x-xsrf-token',
-//        ]);
+        Telescope::hideRequestHeaders([
+            'cookie',
+            'x-csrf-token',
+            'x-xsrf-token',
+        ]);
     }
 
     /**
