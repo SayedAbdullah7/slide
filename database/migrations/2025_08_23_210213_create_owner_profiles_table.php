@@ -15,6 +15,11 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id')->unique()->constrained()->cascadeOnDelete();
             $table->string('business_name')->nullable();
+            $table->string('business_address')->nullable();
+            $table->string('business_phone')->nullable();
+            $table->string('business_email')->nullable();
+            $table->string('business_website')->nullable();
+            $table->text('business_description')->nullable();
             $table->string('goal')->nullable();
             $table->string('tax_number')->nullable();
             $table->timestamps();
