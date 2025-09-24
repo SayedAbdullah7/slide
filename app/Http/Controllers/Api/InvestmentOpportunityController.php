@@ -175,10 +175,41 @@ class InvestmentOpportunityController extends Controller
         }
 
         $perPage = $request->query('per_page', 15);
-        //        $data = $this->service->getUserInvestments($investor->user_id, ['investments_per_page' => $perPage]);
-        $data = $this->service->getHomeData(['investments'], ['investments_per_page' => $perPage], $investor->user_id)['investments'];
+        $page = $request->query('page', 1);
+
+        // Get opportunities with investment details
+        $data = $this->service->getHomeData(['my'], [
+            'my_per_page' => $perPage,
+            'my_page' => $page
+        ], $investor->user_id)['my'];
 
         return $this->respondSuccessWithData('تم جلب استثماراتك بنجاح', $data); // Your investments retrieved successfully
+    }
+
+    /**
+     * Get detailed investment information for a specific opportunity
+     * الحصول على تفاصيل الاستثمار لفرصة محددة
+     */
+    public function myInvestmentDetails(Request $request, $opportunityId)
+    {
+        $investor = Auth::user()?->investorProfile;
+        if (!$investor) {
+            return $this->respondForbidden('لم يتم العثور على بروفايل المستثمر'); // Investor profile not found
+        }
+
+        try {
+            $opportunity = InvestmentOpportunity::with(['investments' => function ($query) use ($investor) {
+                $query->where('user_id', $investor->user_id);
+            }])
+            ->whereHas('investments', function ($query) use ($investor) {
+                $query->where('user_id', $investor->user_id);
+            })
+            ->findOrFail($opportunityId);
+
+            return $this->respondSuccessWithData('تم جلب تفاصيل الاستثمار بنجاح', new InvestmentOpportunityResource($opportunity));
+        } catch (\Exception $e) {
+            return $this->respondNotFound('لم يتم العثور على الاستثمار المطلوب'); // Investment not found
+        }
     }
 
     /**

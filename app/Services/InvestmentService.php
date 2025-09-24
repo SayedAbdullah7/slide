@@ -39,6 +39,65 @@ class InvestmentService
         // Validate investor eligibility
         $this->validateInvestorEligibility($investor, $opportunity);
 
+        // Check if user already has an investment in this opportunity
+        $existingInvestment = $this->getExistingInvestment($investor, $opportunity);
+
+        if ($existingInvestment) {
+            // Update existing investment
+            return $this->updateExistingInvestment($existingInvestment, $shares, $opportunity);
+        } else {
+            // Create new investment
+            return $this->createNewInvestment($investor, $opportunity, $shares, $investmentType);
+        }
+    }
+
+    /**
+     * Get existing investment for user in this opportunity
+     * الحصول على الاستثمار الموجود للمستخدم في هذه الفرصة
+     */
+    protected function getExistingInvestment(InvestorProfile $investor, InvestmentOpportunity $opportunity): ?Investment
+    {
+        return $investor->investments()
+            ->where('opportunity_id', $opportunity->id)
+            ->first();
+    }
+
+    /**
+     * Update existing investment by adding more shares
+     * تحديث الاستثمار الموجود بإضافة المزيد من الأسهم
+     */
+    protected function updateExistingInvestment(Investment $existingInvestment, int $additionalShares, InvestmentOpportunity $opportunity): Investment
+    {
+        // Validate additional shares
+        $this->validateShares($opportunity, $additionalShares, $existingInvestment);
+
+        $additionalAmount = $additionalShares * $opportunity->price_per_share;
+
+        return DB::transaction(function () use ($existingInvestment, $additionalShares, $additionalAmount, $opportunity) {
+            // Process wallet payment for additional shares
+            $this->processWalletPayment($existingInvestment->investor, $additionalAmount, $opportunity);
+
+            // Update existing investment
+            $existingInvestment->shares += $additionalShares;
+            $existingInvestment->amount += $additionalAmount;
+            $existingInvestment->save();
+
+            // Reserve additional shares
+            $opportunity->reserveShares($additionalShares);
+
+            // Check if opportunity is fully funded
+            $this->checkAndUpdateOpportunityStatus($opportunity);
+
+            return $existingInvestment;
+        });
+    }
+
+    /**
+     * Create new investment
+     * إنشاء استثمار جديد
+     */
+    protected function createNewInvestment(InvestorProfile $investor, InvestmentOpportunity $opportunity, int $shares, string $investmentType): Investment
+    {
         // Validate shares
         $this->validateShares($opportunity, $shares);
 
@@ -101,8 +160,9 @@ class InvestmentService
     /**
      * Validate shares count
      * التحقق من عدد الأسهم
+     * @throws InvestmentException
      */
-    protected function validateShares(InvestmentOpportunity $opportunity, int $shares): void
+    protected function validateShares(InvestmentOpportunity $opportunity, int $shares, ?Investment $existingInvestment = null): void
     {
         $minShares = $this->calculateMinShares($opportunity);
         $maxShares = $this->calculateMaxShares($opportunity);
@@ -111,8 +171,20 @@ class InvestmentService
             throw InvestmentException::invalidShares($minShares, $maxShares);
         }
 
-        if ($maxShares !== null && $shares > $maxShares) {
-            throw InvestmentException::invalidShares($minShares, $maxShares);
+        // For existing investments, check total shares (existing + new)
+        if ($existingInvestment) {
+            $totalShares = $existingInvestment->shares + $shares;
+            if ($maxShares !== null && $totalShares > $maxShares) {
+                throw new InvestmentException(
+                    "الحد الأقصى للأسهم المسموح بها هو {$maxShares} سهم. لديك حالياً {$existingInvestment->shares} سهم",
+                    400,
+                    'EXCEEDS_MAX_SHARES'
+                );
+            }
+        } else {
+            if ($maxShares !== null && $shares > $maxShares) {
+                throw InvestmentException::invalidShares($minShares, $maxShares);
+            }
         }
 
         if ($shares > $opportunity->available_shares) {
@@ -160,7 +232,7 @@ class InvestmentService
      */
     protected function createInvestmentRecord(InvestorProfile $investor, InvestmentOpportunity $opportunity, int $shares, float $amount, string $investmentType): Investment
     {
-        return Investment::create([
+        $investmentData = [
             'investor_id' => $investor->id,
             'opportunity_id' => $opportunity->id,
             'shares' => $shares,
@@ -169,7 +241,16 @@ class InvestmentService
             'investment_type' => $investmentType,
             'status' => 'active',
             'investment_date' => now(),
-        ]);
+            'merchandise_status' => 'pending',
+            'distribution_status' => 'pending',
+        ];
+
+        // Set expected delivery date for myself investments
+        if ($investmentType === 'myself' && $opportunity->investment_duration) {
+            $investmentData['expected_delivery_date'] = now()->addDays($opportunity->investment_duration);
+        }
+
+        return Investment::create($investmentData);
     }
 
     /**
@@ -178,10 +259,11 @@ class InvestmentService
      */
     protected function checkAndUpdateOpportunityStatus(InvestmentOpportunity $opportunity): void
     {
-        if ($opportunity->available_shares === 0) {
-            $opportunity->status = 'completed';
-            $opportunity->save();
-        }
+        // Refresh the opportunity to get updated reserved_shares
+        $opportunity->refresh();
+
+        // Update status dynamically based on current conditions
+        $opportunity->updateDynamicStatus();
     }
 
     /**
@@ -193,8 +275,8 @@ class InvestmentService
         if ($opportunity->price_per_share <= 0) {
             throw new InvestmentException('سعر السهم غير صالح'); // Invalid share price
         }
-
-        return (int) ceil($opportunity->min_investment / $opportunity->price_per_share);
+        // min_investment is now stored as number of shares, not currency
+        return max(1, (int) $opportunity->min_investment);
     }
 
     /**
@@ -207,7 +289,8 @@ class InvestmentService
             return null;
         }
 
-        return (int) floor($opportunity->max_investment / $opportunity->price_per_share);
+        // max_investment is now stored as number of shares, not currency
+        return (int) $opportunity->max_investment;
     }
 
     /**
