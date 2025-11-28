@@ -1,0 +1,11 @@
+<x-app-layout>
+
+    <x-dynamic-table
+        table-id="withdrawals_table"
+        :columns="$columns"
+        :filters="$filters"
+        :actions="false"
+    />
+
+</x-app-layout>
+

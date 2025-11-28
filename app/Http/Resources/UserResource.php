@@ -14,22 +14,31 @@ class UserResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $investorProfile = $this->resource->relationLoaded('investorProfile') ? $this->investorProfile : null;
+        $ownerProfile = $this->resource->relationLoaded('ownerProfile') ? $this->ownerProfile : null;
+
         return [
             'id' => $this->id,
             'full_name' => $this->full_name,
+            'display_name' => $this->display_name,
             'email' => $this->email,
             'phone' => $this->phone,
-            'national_id' => $this->national_id,
-            'birth_date' => $this->birth_date,
             'is_active' => $this->is_active,
             'is_registered' => $this->is_registered,
             'email_verified_at' => $this->email_verified_at,
-            'profile_type' => $this->active_profile_type,
-            'profile' => $this->mergeWhen($this->activeProfile(), fn () => match ($this->active_profile_type) {
-                \App\Models\User::PROFILE_INVESTOR => new InvestorProfileResource($this->investorProfile),
-                \App\Models\User::PROFILE_OWNER => new OwnerProfileResource($this->ownerProfile),
-                default => null,
-            }),
+            'active_profile_type' => $this->active_profile_type,
+            'notifications_enabled' => (bool) $this->notifications_enabled,
+            'has_password' => $this->hasPassword(),
+            'profiles' => [
+                'investor' => [
+                    'exists' => (bool) $investorProfile,
+                    'data' => $investorProfile ? new InvestorProfileResource($investorProfile) : null,
+                ],
+                'owner' => [
+                    'exists' => (bool) $ownerProfile,
+                    'data' => $ownerProfile ? new OwnerProfileResource($ownerProfile) : null,
+                ],
+            ],
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

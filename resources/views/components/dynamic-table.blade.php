@@ -34,10 +34,12 @@
             <!--end::Separator-->
             <!--begin::Content-->
             <div class="px-7 py-5" data-kt-user-table-filter="form">
-                @foreach ($filters as $column => $filter)
+                <!--begin::Scrollable Filters Container-->
+                <div class="filter-scroll-container" style="max-height: 60vh; overflow-y: auto; padding-right: 8px;">
+                    @foreach ($filters as $column => $filter)
                     <div class="col">
-                        @if ($filter['type'] === 'select')
-                            <!--begin::Input group-->
+                        @if ($filter['type'] === 'select' || $filter['type'] === 'select-custom' || $filter['type'] === 'boolean')
+                            <!--begin::Input group - Select/Boolean/Custom-->
                             <div class="mb-10">
                                 <label class="form-label fs-6 fw-semibold">{{$filter['label']}}</label>
                                 <select id="filter_{{ $column }}" class="form-select form-select-solid fw-bold table-filter" data-kt-select2="true" data-placeholder="Select option" data-allow-clear="true" data-kt-user-table-filter="{{$column}}" data-hide-search="true">
@@ -49,15 +51,60 @@
                             </div>
                             <!--end::Input group-->
                         @elseif ($filter['type'] === 'date')
-                            <!--begin::Input group-->
+                            <!--begin::Input group - Date-->
                             <div class="mb-10">
-                                <x-group-input-date id="filter_{{ $column }}" class="table-filter" name="filter_{{ $column }}" :label="$filter['label']" :min="$filter['min']" :max="$filter['max']"></x-group-input-date>
+                                <x-group-input-date id="filter_{{ $column }}" class="table-filter" name="filter_{{ $column }}" :label="$filter['label']" :min="$filter['min'] ?? null" :max="$filter['max'] ?? null"></x-group-input-date>
                             </div>
+                            <!--end::Input group-->
+                        @elseif ($filter['type'] === 'date-range')
+                            <!--begin::Input group - Date Range-->
+                            <div class="mb-10">
+                                <label class="form-label fs-6 fw-semibold">{{$filter['label']}}</label>
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <x-group-input-date id="filter_{{ $column }}_from" class="table-filter" name="filter_{{ $column }}_from" label="From" :min="$filter['min'] ?? null" :max="$filter['max'] ?? null"></x-group-input-date>
+                                    </div>
+                                    <div class="col-6">
+                                        <x-group-input-date id="filter_{{ $column }}_to" class="table-filter" name="filter_{{ $column }}_to" label="To" :min="$filter['min'] ?? null" :max="$filter['max'] ?? null"></x-group-input-date>
+                                    </div>
+                                </div>
+                            </div>
+                            <!--end::Input group-->
+                        @elseif ($filter['type'] === 'text')
+                            <!--begin::Input group - Text-->
+                            <div class="mb-10">
+                                <label class="form-label fs-6 fw-semibold">{{$filter['label']}}</label>
+                                <input type="text" id="filter_{{ $column }}" class="form-control form-control-solid table-filter" placeholder="{{$filter['placeholder'] ?? ''}}" data-kt-user-table-filter="{{$column}}" />
+                            </div>
+                            <!--end::Input group-->
+                        @elseif ($filter['type'] === 'number')
+                            <!--begin::Input group - Number-->
+                            <div class="mb-10">
+                                <label class="form-label fs-6 fw-semibold">{{$filter['label']}}</label>
+                                <input type="number" id="filter_{{ $column }}" class="form-control form-control-solid table-filter" placeholder="{{$filter['label']}}" data-kt-user-table-filter="{{$column}}" @if(isset($filter['min'])) min="{{$filter['min']}}" @endif @if(isset($filter['max'])) max="{{$filter['max']}}" @endif />
+                            </div>
+                            <!--end::Input group-->
+                        @elseif ($filter['type'] === 'range')
+                            <!--begin::Input group - Number Range-->
+                            <div class="mb-10">
+                                <label class="form-label fs-6 fw-semibold">{{$filter['label']}}</label>
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <input type="number" id="filter_{{ $column }}_min" class="form-control form-control-solid table-filter" placeholder="Min" data-kt-user-table-filter="{{$column}}" @if(isset($filter['min'])) min="{{$filter['min']}}" @endif @if(isset($filter['max'])) max="{{$filter['max']}}" @endif />
+                                    </div>
+                                    <div class="col-6">
+                                        <input type="number" id="filter_{{ $column }}_max" class="form-control form-control-solid table-filter" placeholder="Max" data-kt-user-table-filter="{{$column}}" @if(isset($filter['min'])) min="{{$filter['min']}}" @endif @if(isset($filter['max'])) max="{{$filter['max']}}" @endif />
+                                    </div>
+                                </div>
+                            </div>
+                            <!--end::Input group-->
                         @endif
                     </div>
-                @endforeach
+                    @endforeach
+                </div>
+                <!--end::Scrollable Filters Container-->
                 <!--begin::Actions-->
-                <div class="d-flex justify-content-end">
+                <div class="d-flex justify-content-end mt-5">
                     <button type="reset" class="btn btn-light btn-active-light-primary fw-semibold me-2 px-6" data-kt-menu-dismiss="true" data-kt-user-table-filter="reset">Reset</button>
                     <button type="submit" class="btn btn-primary fw-semibold px-6" data-kt-menu-dismiss="true" data-kt-user-table-filter="filter">Apply</button>
                 </div>
@@ -136,6 +183,32 @@
     </table>
     <!--end::Datatable-->
 </x-table>
+@push('styles')
+<style>
+    /* Custom scrollbar for filter container */
+    .filter-scroll-container {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(155, 155, 155, 0.5) transparent;
+    }
+
+    .filter-scroll-container::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .filter-scroll-container::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .filter-scroll-container::-webkit-scrollbar-thumb {
+        background-color: rgba(155, 155, 155, 0.5);
+        border-radius: 10px;
+    }
+
+    .filter-scroll-container::-webkit-scrollbar-thumb:hover {
+        background-color: rgba(155, 155, 155, 0.7);
+    }
+</style>
+@endpush
 @push('scripts')
     <script>
         "use strict";
@@ -151,6 +224,25 @@
 
             // Initialize DataTable
             const initDatatable = () => {
+                // Build columnDefs from columns with className or width
+                const dynamicColumnDefs = [];
+                console.log('Columns config:', columns);
+                columns.forEach((col, index) => {
+                    const colDef = { targets: index };
+                    if (col.className) {
+                        colDef.className = col.className;
+                        console.log(`Column ${index} (${col.name}) has className: ${col.className}`);
+                    }
+                    if (col.width) {
+                        colDef.width = col.width;
+                        console.log(`Column ${index} (${col.name}) has width: ${col.width}`);
+                    }
+                    if (col.className || col.width) {
+                        dynamicColumnDefs.push(colDef);
+                    }
+                });
+                console.log('Dynamic columnDefs:', dynamicColumnDefs);
+
                 dt = $('#' + tableId).DataTable({
                     searchDelay: 500,
                     processing: true,
@@ -166,15 +258,49 @@
                         url: ajaxUrl,
                         data: (d) => {
                             Object.keys(filters).forEach((key) => {
-                                const filterValue = document.querySelector(`#filter_${key}`)?.value;
-                                if (filterValue) {
-                                    d[key] = filterValue;
+                                const filterConfig = filters[key];
+                                const filterType = filterConfig.type || 'select';
+
+                                // Handle range filters (date-range, range)
+                                if (filterType === 'date-range') {
+                                    const fromValue = document.querySelector(`#filter_${key}_from`)?.value;
+                                    const toValue = document.querySelector(`#filter_${key}_to`)?.value;
+                                    if (fromValue) {
+                                        d[`${key}_from`] = fromValue;
+                                    }
+                                    if (toValue) {
+                                        d[`${key}_to`] = toValue;
+                                    }
+                                    // Also set main key if both values exist
+                                    if (fromValue && toValue) {
+                                        d[key] = `${fromValue}|${toValue}`;
+                                    }
+                                } else if (filterType === 'range') {
+                                    const minValue = document.querySelector(`#filter_${key}_min`)?.value;
+                                    const maxValue = document.querySelector(`#filter_${key}_max`)?.value;
+                                    if (minValue !== null && minValue !== '') {
+                                        d[`${key}_min`] = minValue;
+                                    }
+                                    if (maxValue !== null && maxValue !== '') {
+                                        d[`${key}_max`] = maxValue;
+                                    }
+                                    // Also set main key if both values exist
+                                    if (minValue && maxValue) {
+                                        d[key] = `${minValue}|${maxValue}`;
+                                    }
+                                } else {
+                                    // Regular filters (select, text, number, date, boolean)
+                                    const filterValue = document.querySelector(`#filter_${key}`)?.value;
+                                    if (filterValue) {
+                                        d[key] = filterValue;
+                                    }
                                 }
                             });
                         }
                     },
                     columns: columns,
                     columnDefs: [
+                        ...dynamicColumnDefs,
                             @if($showCheckbox)
                         {
                             targets: 0,
@@ -215,24 +341,36 @@
                     handleDeleteRows();
                     KTMenu.createInstances();
                 });
+
                 const elemnt = $('#columns');
 
-                function handleColumnSelection(columns, elementId, tableId,dt) {
-                    const key = 'selectedColumns'+tableId;
+                function handleColumnSelection(columns, elementId, tableId, dt) {
+                    const key = 'selectedColumns' + tableId;
                     console.log(key)
                     const elemnt = $(elementId);
-                    // const dt = $(tableId).DataTable();
 
-                    // Append options to the select element
-                    elemnt.append(columns.map(col => new Option(col.name, col.name)));
+                    // Retrieve saved selected option values or default to visible columns only
+                    const savedValues = JSON.parse(localStorage.getItem(key)) || columns.filter(col => col.visible === true).map(col => col.name);
 
-                    // Retrieve saved selected option values or default to all columns
-                    const savedValues = JSON.parse(localStorage.getItem(key)) || columns.map((col, idx) => col.name);
-                    elemnt.val(savedValues).trigger('change'); // Set the selected options
+                    // Apply saved visibility BEFORE setting up the select options
+                    columns.forEach((col, index) => {
+                        if (savedValues.includes(col.name)) {
+                            dt.column(index).visible(true);
+                        } else {
+                            dt.column(index).visible(false);
+                        }
+                    });
+
+                    // Append options to the select element - show title but use name as value
+                    elemnt.append(columns.map(col => new Option(col.title || col.name, col.name)));
+                    console.log('append count ' + columns.length + ' to ' + elementId)
+                    console.log('columns', columns)
+
+                    // Set the selected options in the dropdown
+                    elemnt.val(savedValues).trigger('change.select2'); // Use change.select2 to update Select2 without triggering our custom handler
 
                     // Handle visibility of DataTable columns on change
                     elemnt.on('change', function() {
-
                         const selectedValues = elemnt.val(); // Selected option values
                         const allValues = $('#columns option').map((_, option) => $(option).val()).get();
 
@@ -250,14 +388,22 @@
                         localStorage.setItem(key, JSON.stringify(selectedValues));
                     });
                 }
-// Example usage for different tables:
-                handleColumnSelection(columns, '#columns', tableId,dt);
+                // Example usage for different tables:
+                handleColumnSelection(columns, '#columns', tableId, dt);
             };
 
             // Search functionality
             const handleSearchDatatable = () => {
                 const searchInput = document.querySelector('[data-kt-user-table-filter="search"]');
+                console.log('*****************');
+
+                console.log('searchInput');
+                console.log(searchInput);
+
                 searchInput?.addEventListener('keyup', (e) => {
+                    console.log('keyup');
+                    // console.log(e.target);
+                    console.log(e.target.value);
                     dt.search(e.target.value).draw();
                 });
             };
@@ -266,13 +412,9 @@
             const handleFilterDatatable = () => {
                 const filterButton = document.querySelector('[data-kt-user-table-filter="filter"]');
                 filterButton?.addEventListener('click', () => {
-                    Object.keys(filters).forEach((key) => {
-                        const filterInput = document.querySelector(`#filter_${key}`);
-                        if (filterInput) {
-                            const index = columns.findIndex(item => item.data === key);
-                            dt.column(index).search(filterInput.value).draw();
-                        }
-                    });
+                    // Reload DataTable with new filter values
+                    // Filters are automatically sent in ajax.data callback
+                    dt.ajax.reload();
                 });
             };
 
@@ -282,9 +424,22 @@
                 resetButton?.addEventListener('click', () => {
                     dt.columns().search('').draw();
                     document.querySelectorAll('.table-filter').forEach((filter) => {
-                        if (filter.tagName === 'INPUT') filter.value = '';
-                        if (filter.tagName === 'SELECT') filter.selectedIndex = 0;
+                        if (filter.tagName === 'INPUT') {
+                            filter.value = '';
+                            // Reset Select2 if initialized
+                            if ($(filter).hasClass('select2-hidden-accessible')) {
+                                $(filter).val(null).trigger('change');
+                            }
+                        } else if (filter.tagName === 'SELECT') {
+                            filter.selectedIndex = 0;
+                            // Reset Select2 if initialized
+                            if ($(filter).hasClass('select2-hidden-accessible')) {
+                                $(filter).val(null).trigger('change');
+                            }
+                        }
                     });
+                    // Trigger redraw to apply cleared filters
+                    dt.ajax.reload();
                 });
             };
 

@@ -4,7 +4,10 @@ namespace App\Services;
 
 use App\Repositories\InvestmentOpportunityRepository;
 use App\Http\Resources\InvestmentOpportunityResource;
+use App\Http\Resources\InvestmentResource;
+use App\Http\Resources\WalletTransactionResource;
 use App\Models\InvestmentOpportunity;
+use App\Models\Investment;
 use App\Models\InvestorProfile;
 use App\Services\WalletService;
 use Illuminate\Support\Facades\Auth;
@@ -44,8 +47,7 @@ class InvestmentOpportunityService
 
         if (in_array('my', $types)) {
             $data['my'] = $userId
-                ? $this->getPaginatedData(
-                    'my',
+                ? $this->getUserInvestmentsPaginated(
                     $params['my_per_page'] ?? 15,
                     $params['my_page'] ?? 1,
                     $userId
@@ -68,15 +70,53 @@ class InvestmentOpportunityService
             $data['investments'] = $this->getUserInvestments($userId, $params);
         }
 
+        if (in_array('reminders', $types)) {
+            $data['reminders'] = $this->getPaginatedData(
+                'reminders',
+                $params['reminders_per_page'] ?? 7,
+                $params['reminders_page'] ?? 1,
+                $userId
+            );
+        }
+
+        if (in_array('saved', $types)) {
+            $data['saved'] = $this->getPaginatedData(
+                'saved',
+                $params['saved_per_page'] ?? 7,
+                $params['saved_page'] ?? 1,
+                $userId
+            );
+        }
+
+        // saved opportunities that are coming
+        if (in_array('coming_saved', $types)) {
+            $data['coming_saved'] = $this->getPaginatedData(
+                'comingSaved',
+                $params['saved_per_page'] ?? 7,
+                $params['saved_page'] ?? 1,
+                $userId
+            );
+        }
+
+        // saved opportunities that are available
+        if (in_array('available_saved', $types)) {
+            $data['available_saved'] = $this->getPaginatedData(
+                'availableSaved',
+                $params['saved_per_page'] ?? 7,
+                $params['saved_page'] ?? 1,
+                $userId
+            );
+        }
+
         return $data;
     }
 
     protected function getPaginatedData(string $type, int $perPage, int $page, $userId = null)
     {
         $method = 'get' . ucfirst($type);
-        $paginator = $userId
-            ? $this->repo->{$method}($userId, $perPage, $page)
-            : $this->repo->{$method}($perPage, $page);
+
+        // All methods now have userId as the last parameter
+        $paginator = $this->repo->{$method}($perPage, $page, $userId);
 
         return [
             'data' => InvestmentOpportunityResource::collection($paginator->items()),
@@ -139,9 +179,12 @@ class InvestmentOpportunityService
         try {
             if (!$userId) {
                 return [
-                    'balance' => '0',
-                    'total_profits' => '0',
-                    'pending_profits' => '0',
+                    'balance' => '0.00',
+                    'formatted_balance' => '0.00',
+                    'total_profits' => '0.00',
+                    'pending_profits' => '0.00',
+                    'transactions' => [],
+                    'pagination' => $this->getEmptyPagination()['meta'],
                     'error' => 'يجب تسجيل الدخول للوصول إلى المحفظة' // Must be logged in to access wallet
                 ];
             }
@@ -150,37 +193,183 @@ class InvestmentOpportunityService
 
             if (!$investor) {
                 return [
-                    'balance' => '0',
-                    'total_profits' => '0',
-                    'pending_profits' => '0',
+                    'balance' => '0.00',
+                    'formatted_balance' => '0.00',
+                    'total_profits' => '0.00',
+                    'pending_profits' => '0.00',
+                    'transactions' => [],
+                    'pagination' => $this->getEmptyPagination()['meta'],
                     'error' => 'لم يتم العثور على بروفايل المستثمر' // Investor profile not found
                 ];
             }
 
+            // Get wallet balance
             $balance = $this->walletService->getWalletBalance($investor);
+
+
+            // Get transactions with pagination
             $perPage = $params['wallet_per_page'] ?? 10;
+            $page = $params['wallet_page'] ?? 1;
             $transactions = $this->walletService->getWalletTransactions($investor, $perPage);
+
+            // Calculate profits from investments
+            $profitData = $this->calculateInvestmentProfits($investor);
 
             return [
                 'balance' => number_format($balance, 2),
-                'total_profits' => '0', // TODO: Calculate from completed investments
-                'pending_profits' => '0', // TODO: Calculate from active investments
-                'transactions' => $transactions->items(),
+                'formatted_balance' => number_format($balance, 2),
+                'total_profits' => number_format($profitData['total_profits'], 2),
+                'pending_profits' => number_format($profitData['pending_profits'], 2),
+                'transactions' => WalletTransactionResource::collection($transactions->items()),
                 'pagination' => [
                     'current_page' => $transactions->currentPage(),
                     'last_page' => $transactions->lastPage(),
                     'per_page' => $transactions->perPage(),
                     'total' => $transactions->total(),
+                    'from' => $transactions->firstItem(),
+                    'to' => $transactions->lastItem(),
+                ],
+                'profit_breakdown' => $profitData['breakdown'],
+                'wallet_info' => [
+                    'profile_type' => 'investor',
+                    'profile_id' => $investor->id,
+                    'user_id' => $userId,
+                    'wallet_exists' => true,
                 ]
             ];
         } catch (Exception $e) {
             return [
-                'balance' => '0',
-                'total_profits' => '0',
-                'pending_profits' => '0',
+                'balance' => '0.00',
+                'formatted_balance' => '0.00',
+                'total_profits' => '0.00',
+                'pending_profits' => '0.00',
+                'transactions' => [],
+                'pagination' => $this->getEmptyPagination()['meta'],
                 'error' => 'فشل في تحميل بيانات المحفظة: ' . $e->getMessage() // Failed to load wallet data
             ];
         }
+    }
+
+    /**
+     * Calculate investment profits for investor
+     * حساب أرباح الاستثمارات للمستثمر
+     *
+     * Uses unified logic from Investment model:
+     * - Realized profits: distributed profits from authorize type investments
+     * - Pending profits: expected profits from not distributed authorize type investments
+     */
+    protected function calculateInvestmentProfits($investor): array
+    {
+        try {
+            $investments = $investor->investments()
+                ->with(['opportunity'])
+                ->get();
+
+            // Use unified methods from Investment model
+            $realizedProfits = 0;
+            $pendingProfits = 0;
+            $breakdown = [
+                'completed_investments' => 0,
+                'active_investments' => 0,
+                'pending_investments' => 0,
+                'cancelled_investments' => 0,
+                'total_invested' => 0,
+                'expected_returns' => 0,
+                'distributed_investments' => 0,
+                'not_distributed_investments' => 0,
+            ];
+
+            foreach ($investments as $investment) {
+                $amount = (float) $investment->total_investment;
+                $breakdown['total_invested'] += $amount;
+
+                // Use unified profit calculation methods
+                $realizedProfits += $investment->getRealizedProfit();
+                $pendingProfits += $investment->getPendingProfit();
+
+                // Update breakdown based on investment status
+                switch ($investment->status) {
+                    case 'completed':
+                        $breakdown['completed_investments']++;
+                        break;
+
+                    case 'active':
+                        $breakdown['active_investments']++;
+                        break;
+
+                    case 'pending':
+                        $breakdown['pending_investments']++;
+                        break;
+
+                    case 'cancelled':
+                        $breakdown['cancelled_investments']++;
+                        break;
+                }
+
+                // Count distributed vs not distributed authorize investments
+                if ($investment->isAuthorizeType()) {
+                    if ($investment->isDistributed()) {
+                        $breakdown['distributed_investments']++;
+                    } else {
+                        $breakdown['not_distributed_investments']++;
+                    }
+
+                    // Add expected returns for authorize investments
+                    if (!$investment->isDistributed()) {
+                        $breakdown['expected_returns'] += $investment->getExpectedNetProfit();
+                    }
+                }
+            }
+
+            return [
+                'total_profits' => $realizedProfits,
+                'pending_profits' => $pendingProfits,
+                'breakdown' => $breakdown,
+            ];
+        } catch (Exception $e) {
+            return [
+                'total_profits' => 0,
+                'pending_profits' => 0,
+                'breakdown' => [
+                    'completed_investments' => 0,
+                    'active_investments' => 0,
+                    'pending_investments' => 0,
+                    'cancelled_investments' => 0,
+                    'total_invested' => 0,
+                    'expected_returns' => 0,
+                    'distributed_investments' => 0,
+                    'not_distributed_investments' => 0,
+                ],
+            ];
+        }
+    }
+
+    /**
+     * Get user's investments with pagination for 'my' section
+     * الحصول على استثمارات المستخدم مع التصفح لقسم 'my'
+     */
+    protected function getUserInvestmentsPaginated(int $perPage, int $page, $userId): array
+    {
+        if (!$userId) {
+            return $this->getEmptyPagination();
+        }
+
+        $investor = InvestorProfile::where('user_id', $userId)->first();
+
+        if (!$investor) {
+            return $this->getEmptyPagination();
+        }
+
+        $investments = $investor->investments()
+            ->with(['investmentOpportunity.category', 'investmentOpportunity.ownerProfile'])
+            ->orderBy('created_at', 'desc')
+            ->paginate($perPage, ['*'], 'my_page', $page);
+
+        return [
+            'data' => InvestmentResource::collection($investments->items()),
+            'links' => $this->getPaginationLinks($investments),
+            'meta' => $this->getPaginationMeta($investments)
+        ];
     }
 
     /**
@@ -239,7 +428,7 @@ class InvestmentOpportunityService
                 $data['can_invest'] = $opportunity->isInvestable() &&
                                     $investor->user_id !== optional($opportunity->ownerProfile)->user_id;
                 $data['user_has_invested'] = $userInvestment !== null;
-                $data['user_investment_amount'] = $userInvestment ? $userInvestment->amount : 0;
+                $data['user_investment_amount'] = $userInvestment ? $userInvestment->total_investment : 0;
             }
         }
 
@@ -292,4 +481,36 @@ class InvestmentOpportunityService
             'meta' => $this->getPaginationMeta($opportunities)
         ];
     }
+
+    /**
+     * Update investment opportunity and process reminders if needed
+     * تحديث فرصة الاستثمار ومعالجة التذكيرات إذا لزم الأمر
+     */
+    public function updateOpportunity(InvestmentOpportunity $opportunity, array $data): InvestmentOpportunity
+    {
+        $oldStatus = $opportunity->status;
+        $oldOfferingStartDate = $opportunity->offering_start_date;
+
+        // Update the opportunity
+        $opportunity->update($data);
+
+        // Check if opportunity became available and process reminders
+        if (($oldStatus !== 'open' && $opportunity->status === 'open') ||
+            ($oldOfferingStartDate !== $opportunity->offering_start_date && $opportunity->isInvestable())) {
+            $opportunity->processReminders();
+        }
+
+        return $opportunity;
+    }
+
+    /**
+     * Process reminders for opportunities that became available
+     * معالجة التذكيرات للفرص التي أصبحت متاحة
+     */
+    public function processAvailableOpportunityReminders(): int
+    {
+        $reminderService = app(\App\Services\InvestmentOpportunityReminderService::class);
+        return $reminderService->sendReminders();
+    }
+
 }

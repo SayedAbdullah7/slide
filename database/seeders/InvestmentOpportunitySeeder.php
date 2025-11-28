@@ -14,6 +14,7 @@ class InvestmentOpportunitySeeder extends Seeder
      */
     public function run(): void
     {
+//        return;
         if(InvestmentOpportunity::count() > 0) {
             $this->command->warn('InvestmentOpportunities already seeded.');
             return;
@@ -85,70 +86,168 @@ class InvestmentOpportunitySeeder extends Seeder
             return;
         }
 
-        // Increase number of records to 50
-        for ($i = 0; $i < 50; $i++) {
-            $targetAmount = $faker->randomFloat(2, 100000, 2000000);
-            $pricePerShare = $faker->randomFloat(2, 100, 2000);
-            $totalShares = floor($targetAmount / $pricePerShare);
-            $reservedShares = $faker->numberBetween(0, $totalShares);
+        // إنشاء 10 مشاريع حالية
+        $this->command->info('🔄 Creating 10 current opportunities...');
+        for ($i = 0; $i < 10; $i++) {
+            $targetAmount = 2000000; // 2 مليون ريال
+            $pricePerShare = 500; // 500 ريال للسهم
+            $totalShares = floor($targetAmount / $pricePerShare); // 4000 سهم
+            $reservedShares = 0; // لا يوجد أسهم محجوزة
 
-            $offeringStart = $faker->dateTimeBetween('-6 months', 'now');
-            $offeringEnd = (clone $offeringStart)->modify('+' . rand(1, 12) . ' months');
-            $showDate = $faker->dateTimeBetween('-3 months', 'now');
-            $profitDistributionDate = (clone $offeringEnd)->modify('+' . rand(6, 24) . ' months');
+            $now = now();
+            $offeringStart = $now->copy()->subDays(30); // بدأ منذ 30 يوم
+            $offeringEnd = $now->copy()->addMonths(6); // ينتهي بعد 6 أشهر
+            $showDate = $now->copy()->subDays(45); // ظهر قبل 45 يوم
+            $profitDistributionDate = $offeringEnd->copy()->addMonths(5); // توزيع الأرباح بعد 5 اشهر من الانتهاء
 
-            // Calculate expected returns based on price per share
-            $expectedReturnByMyself = $pricePerShare * $faker->randomFloat(2, 0.15, 0.35); // 15-35% return
-            $expectedNetReturnByMyself = $expectedReturnByMyself * $faker->randomFloat(2, 0.7, 0.9); // 70-90% of gross return
-            $expectedReturnByAuthorize = $pricePerShare * $faker->randomFloat(2, 0.20, 0.40); // 20-40% return
-            $expectedNetReturnByAuthorize = $expectedReturnByAuthorize * $faker->randomFloat(2, 0.6, 0.8); // 60-80% of gross return
+            // Calculate expected returns per share
+            $expectedReturnByAuthorize = $faker->randomFloat(2, 100, 300); // عائد متوقع للسهم
+            $expectedNetReturnByAuthorize = $expectedReturnByAuthorize * $faker->randomFloat(2, 0.7, 0.85);
 
             $opportunity = InvestmentOpportunity::create([
-                'name' => 'مشروع ' . $faker->company,
+                'name' => 'مشروع ' . $faker->company . ' - حالي #' . ($i + 1),
                 'location' => $faker->city,
                 'description' => $faker->randomElement($descriptions),
                 'category_id' => $categories->random()->id,
                 'owner_profile_id' => $owners->random()->id,
-                'status' => $faker->randomElement(['open', 'completed', 'suspended']),
+                'status' => 'open', // مشروع حالي ومفتوح
                 'risk_level' => $faker->randomElement(['low', 'medium', 'high']),
                 'target_amount' => $targetAmount,
-                'price_per_share' => $pricePerShare,
+                'share_price' => $pricePerShare,
                 'reserved_shares' => $reservedShares,
-                'shipping_and_service_fee' => $faker->randomFloat(2, 5, 20),
-                'investment_duration' => $faker->numberBetween(6, 60),
-                'expected_return_amount_by_myself' => $expectedReturnByMyself,
-                'expected_net_return_by_myself' => $expectedNetReturnByMyself,
-                'expected_return_amount_by_authorize' => $expectedReturnByAuthorize,
-                'expected_net_return_by_authorize' => $expectedNetReturnByAuthorize,
-                'min_investment' => $faker->randomFloat(2, 100, 1000),
-                'max_investment' => $faker->randomFloat(2, 10000, 100000),
+                'investment_duration' => 24, // سنتين
+                'expected_profit' => $expectedReturnByAuthorize,
+                'expected_net_profit' => $expectedNetReturnByAuthorize,
+                'shipping_fee_per_share' => $faker->randomFloat(2, 10, 30),
+                'min_investment' => 10, // حد أدنى 10 أسهم
+                'max_investment' => 1000, // حد أقصى 1000 سهم
                 'fund_goal' => $faker->randomElement(['growth', 'stability', 'income']),
-                'show' => $faker->boolean(80),
+                'guarantee' => $faker->randomElement(['real_estate_mortgage', 'bank_guarantee', 'personal_guarantee', 'asset_pledge', 'insurance_policy']),
+                'show' => true,
                 'show_date' => $showDate,
                 'offering_start_date' => $offeringStart,
                 'offering_end_date' => $offeringEnd,
                 'profit_distribution_date' => $profitDistributionDate,
+                'expected_delivery_date' => $offeringEnd->copy()->addDays(90),
+                'expected_distribution_date' => $profitDistributionDate,
+                'all_merchandise_delivered' => false,
+                'all_returns_distributed' => false,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
 
-            // إضافة ملفات الميديا
-            $opportunity->addMedia($termsPath)->preservingOriginal()->toMediaCollection('terms');
-            $opportunity->addMedia($summaryPath)->preservingOriginal()->toMediaCollection('summary');
-
-            // صور غلاف عشوائية من المجلد
-            // add from 2 to 5 images
-            for ($x = 0; $x < $faker->numberBetween(2, 5); $x++) {
-                $coverPath = $this->getRandomImageFromFolder($coversFolder);
-                $opportunity->addMedia($coverPath)->preservingOriginal()->toMediaCollection('cover');
-            }
-            //         $coverPath = $this->getRandomImageFromFolder($coversFolder);
-            //         $opportunity->addMedia($coverPath)->preservingOriginal()->toMediaCollection('cover');
-            // }
-            $this->command->info('✅ Seeded investment opportunity ' . $opportunity->name . ' number ' . $i);
+            $this->addMediaToOpportunity($opportunity, $termsPath, $summaryPath, $coversFolder, $faker);
+            $this->command->info('✅ Created current opportunity: ' . $opportunity->name);
         }
 
-        $this->command->info('✅ Seeded 50 investment opportunities with media files.');
+        // إنشاء 5 مشاريع قادمة (كل واحد ينزل بعد 12 ساعة)
+        $this->command->info('🔄 Creating 5 upcoming opportunities...');
+        for ($i = 0; $i < 5; $i++) {
+            $targetAmount = 2000000; // 2 مليون ريال
+            $pricePerShare = 500; // 500 ريال للسهم
+            $totalShares = floor($targetAmount / $pricePerShare); // 4000 سهم
+            $reservedShares = 0; // لا يوجد أسهم محجوزة
+
+            $now = now();
+            // كل مشروع يبدأ بعد 12 ساعة من اللي قبله
+            $offeringStart = $now->copy()->addHours(12 * ($i + 1));
+            $offeringEnd = $offeringStart->copy()->addMonths(6);
+            $showDate = $offeringStart->copy()->subDays(15); // يظهر قبل البداية ب 15 يوم
+            $profitDistributionDate = $offeringEnd->copy()->addMonths(12);
+
+            // Calculate expected returns per share
+            $expectedReturnByAuthorize = $faker->randomFloat(2, 100, 300);
+            $expectedNetReturnByAuthorize = $expectedReturnByAuthorize * $faker->randomFloat(2, 0.7, 0.85);
+
+            $opportunity = InvestmentOpportunity::create([
+                'name' => 'مشروع ' . $faker->company . ' - قادم #' . ($i + 1),
+                'location' => $faker->city,
+                'description' => $faker->randomElement($descriptions),
+                'category_id' => $categories->random()->id,
+                'owner_profile_id' => $owners->random()->id,
+                'status' => 'upcoming', // مشروع قادم
+                'risk_level' => $faker->randomElement(['low', 'medium', 'high']),
+                'target_amount' => $targetAmount,
+                'share_price' => $pricePerShare,
+                'reserved_shares' => $reservedShares,
+                'investment_duration' => 24,
+                'expected_profit' => $expectedReturnByAuthorize,
+                'expected_net_profit' => $expectedNetReturnByAuthorize,
+                'shipping_fee_per_share' => $faker->randomFloat(2, 10, 30),
+                'min_investment' => 10, // حد أدنى 10 أسهم
+                'max_investment' => 1000, // حد أقصى 1000 سهم
+                'fund_goal' => $faker->randomElement(['growth', 'stability', 'income']),
+                'guarantee' => $faker->randomElement(['real_estate_mortgage', 'bank_guarantee', 'personal_guarantee', 'asset_pledge', 'insurance_policy']),
+                'show' => true,
+                'show_date' => $showDate,
+                'offering_start_date' => $offeringStart,
+                'offering_end_date' => $offeringEnd,
+                'profit_distribution_date' => $profitDistributionDate,
+                'expected_delivery_date' => $offeringEnd->copy()->addDays(90),
+                'expected_distribution_date' => $profitDistributionDate,
+                'all_merchandise_delivered' => false,
+                'all_returns_distributed' => false,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $this->addMediaToOpportunity($opportunity, $termsPath, $summaryPath, $coversFolder, $faker);
+            $hours = 12 * ($i + 1);
+            $this->command->info('✅ Created upcoming opportunity (starts after ' . $hours . ' hours): ' . $opportunity->name);
+        }
+
+        $this->command->info('✅ Seeded 10 current and 5 upcoming investment opportunities with media files.');
+
+        // Update all opportunities with dynamic status based on their dates
+        $this->command->info('🔄 Updating opportunity statuses based on dates...');
+        $this->updateOpportunityStatuses();
+    }
+
+    /**
+     * Update all opportunities with dynamic status based on their dates
+     */
+    protected function updateOpportunityStatuses(): void
+    {
+        $opportunities = InvestmentOpportunity::all();
+        $updated = 0;
+
+        foreach ($opportunities as $opportunity) {
+            if ($opportunity->shouldUpdateStatus()) {
+                $oldStatus = $opportunity->status;
+                $opportunity->updateDynamicStatus();
+                $newStatus = $opportunity->status;
+
+                if ($oldStatus !== $newStatus) {
+                    $updated++;
+                }
+            }
+        }
+
+        $this->command->info("✅ Updated {$updated} opportunities with dynamic statuses.");
+    }
+
+    /**
+     * إضافة ملفات الميديا لفرصة استثمارية
+     */
+    protected function addMediaToOpportunity($opportunity, $termsPath, $summaryPath, $coversFolder, $faker): void
+    {
+        // إضافة ملفات الميديا
+        $opportunity->addMedia($termsPath)->preservingOriginal()->toMediaCollection('terms');
+        $opportunity->addMedia($summaryPath)->preservingOriginal()->toMediaCollection('summary');
+
+        // إضافة صورة المالك
+        $ownerAvatarPath = $this->getRandomImageFromFolder(storage_path('app/seeder_files/avatars'));
+        if ($ownerAvatarPath) {
+            $opportunity->addMedia($ownerAvatarPath)->preservingOriginal()->toMediaCollection('owner_avatar');
+        }
+
+        // صور غلاف عشوائية من المجلد (من 2 إلى 5 صور)
+        for ($x = 0; $x < $faker->numberBetween(2, 5); $x++) {
+            $coverPath = $this->getRandomImageFromFolder($coversFolder);
+            if ($coverPath) {
+                $opportunity->addMedia($coverPath)->preservingOriginal()->toMediaCollection('cover');
+            }
+        }
     }
 
     /**

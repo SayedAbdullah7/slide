@@ -3,8 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\InvestorProfileResource;
+use App\Http\Resources\OwnerProfileResource;
 use App\Http\Resources\PhoneSessionResource;
+use App\Http\Resources\UserResource;
 use App\Http\Traits\Helpers\ApiResponseTrait;
+use App\Rules\SaudiPhoneNumber;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
@@ -30,7 +34,7 @@ class UserAuthController extends Controller
     public function checkPhone(Request $request)
     {
         $request->validate([
-            'phone' => 'required|string'
+            'phone' => ['required', 'string', new SaudiPhoneNumber()]
         ]);
 
         $user = User::where('phone', $request->phone)->first();
@@ -59,12 +63,33 @@ class UserAuthController extends Controller
     // إرسال OTP
     public function sendOtp(Request $request)
     {
-        $request->validate(['phone' => 'required|string']);
-        $otp = $this->otpService->generate($request->phone);
+        $request->validate([
+            'phone' => ['required', 'string', new SaudiPhoneNumber()],
+            'type' => 'sometimes|in:login,confirm,register',
+            'operation_name' => 'sometimes|string|max:100'
+        ]);
 
-        // TODO: إرسال كـ SMS
-//        return response()->json(['message'=>'OTP sent','debug_code'=>$otp->code]);
-        return $this->respondSuccess('OTP sent');
+        $type = $request->input('type', 'login');
+        $operationName = $request->input('operation_name', '');
+
+        $result = $this->otpService->generate($request->phone, $type, $operationName);
+
+        if (!$result['success']) {
+            if (isset($result['next_available_at'])) {
+                return $this->respondError($result['message'], 422, null, 1, [
+                    'next_available_at' => $result['next_available_at'],
+                    'seconds_remaining' => $result['seconds_remaining']
+                ]);
+            }
+            return $this->respondError($result['message'], 422);
+        }
+
+        $responseData = [];
+        if (isset($result['expires_at'])) {
+            $responseData['expires_at'] = $result['expires_at'];
+        }
+
+        return $this->respondSuccessWithData($result['message'], $responseData);
     }
 
     // التحقق من OTP → إصدار Session Token
@@ -75,7 +100,7 @@ class UserAuthController extends Controller
     public function verifyOtp(Request $request)
     {
         $data = $request->validate([
-            'phone' => 'required|string',
+            'phone' => ['required', 'string', new SaudiPhoneNumber()],
             'code'  => 'required|string',
             'profile' => 'sometimes|in:owner,investor',
         ]);
@@ -89,20 +114,44 @@ class UserAuthController extends Controller
         $user = User::where('phone', $data['phone'])->first();
 
         if ($user) {
+            // Ensure active_profile_type is set
+            $user->ensureActiveProfileType();
+
+            // Switch to requested profile if different from current
             if ($request->profile && $user->active_profile_type !== $request->profile) {
                 $user = $this->profileFactoryService->switch($user, $request->profile);
             }
+
             $token = $this->UserAuthService->login($user);
+
+
+            // Handle FCM token if provided
+            if ($request->has('fcm_token')) {
+                try {
+                    $user->addFcmToken(
+                        $request->fcm_token,
+                        $request->device_id,
+                        $request->platform,
+                        $request->app_version
+                    );
+                } catch (\Exception $e) {
+                    // Log error but don't fail registration
+                    \Log::warning('Failed to register FCM token during registration', [
+                        'user_id' => $user->id,
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            }
+
+            $user->loadMissing('investorProfile', 'ownerProfile');
 
             return $this->respondSuccessWithData('OTP verified successfully', [
                 'is_new_user' => false,
                 'token'       => $token,
-                'user'        => $user,
-                'profiles' => [
-                    'investor' => $user->hasInvestor(),
-                    'owner' => $user->hasOwner(),
-                ],
+                'user'        => new UserResource($user),
+                'profiles' => $this->buildProfilesPayload($user),
                 'active_profile_type' => $user->active_profile_type,
+                'notifications_enabled' => (bool) $user->notifications_enabled,
                 'phone_session' => new PhoneSessionResource($session),
                 'has_password' => $user->hasPassword(),
             ]);
@@ -122,49 +171,65 @@ class UserAuthController extends Controller
      */
     public function register(Request $request)
     {
-        $tokenPhone = $request->session_token;
-        $session = PhoneSession::where('token', $tokenPhone)->first();
-        if (!$session || $session->isExpired()) {
 
-            return $this->respondError('Session expired', 422);
+        // Check if user is authenticated (for adding new profile)
+        $user = $request->user();
+
+        // If not authenticated, require session_token
+        if (!$user) {
+            $tokenPhone = $request->session_token;
+            $session = PhoneSession::where('token', $tokenPhone)->first();
+            if (!$session || $session->isExpired()) {
+                return $this->respondError('Session expired', 422);
+            }
+
+            // check if user already exists by phone
+            $user = User::where('phone', $session->phone)->first();
         }
 
-        // check if user already exists
-        $user = User::where('phone', $session->phone)->first();
-
         if (!$user) {
-            // if user not exists, validate for create new user
+            // New user registration - validate all required fields
             $data = $request->validate([
                 'session_token' => 'required|string|exists:phone_sessions,token',
-                'full_name'      => 'required|string',
                 'email' => 'nullable|email|unique:users,email',
-                'national_id'     => 'required|string',
-                'birth_date' => 'required|date|date_format:Y-m-d',
                 'answers'          => 'required|array',
                 'profile' => 'required|in:owner,investor',
-                'tax_number'     => 'required_if:profile,owner',
-//                'tax_number' => 'required_if:profile,owner|unique:owner_profiles,tax_number',
+                // Investor profile fields
+                'full_name'      => 'required_if:profile,investor|string',
+                'national_id'     => 'required_if:profile,investor|string',
+                'birth_date' => 'required_if:profile,investor|date|date_format:Y-m-d',
+                // Owner profile fields
+                'business_name' => 'required_if:profile,owner',
+                'tax_number' => 'required_if:profile,owner|unique:owner_profiles,tax_number',
             ]);
             //validate answers
             $this->surveyService->validateAnswers($data['answers']);
-        }else{
-            // if user exists, validate for create new profile
+        } else {
+            // Existing user adding new profile - session_token optional if authenticated
             $data = $request->validate([
-                'session_token' => 'required|string|exists:phone_sessions,token',
+                'session_token' => 'sometimes|exists:phone_sessions,token',
                 'profile' => 'required|in:owner,investor',
-//                'tax_number'     => 'required_if:profile,owner',
+                // Investor profile fields
+                'full_name'      => 'required_if:profile,investor|string',
+                'national_id'     => 'required_if:profile,investor|string',
+                'birth_date' => 'required_if:profile,investor|date|date_format:Y-m-d',
+                // Owner profile fields
+                'business_name' => 'required_if:profile,owner|string',
                 'tax_number' => 'required_if:profile,owner|unique:owner_profiles,tax_number',
             ]);
+
+            // If user has a pending delete request, cancel it since they're re-registering
+            if ($user->hasPendingDeleteRequest()) {
+                $user->cancelDeleteRequest();
+            }
         }
 
        // create user if not exists
         if (!$user) {
             $user = $this->UserAuthService->register([
                 'phone'             => $session->phone,
-                'full_name'        => $data['full_name'],
                 'email'               => $data['email'] ?? null,
-                'national_id'      => $data['national_id'] ?? null,
-                'birth_date'       => $data['birth_date'] ?? null,
+                'active_profile_type' => $data['profile'], // Set the profile type during registration
             ]);
             // save answers
             $this->surveyService->saveAnswers($user, $data['answers']);
@@ -180,25 +245,38 @@ class UserAuthController extends Controller
 //                throw ValidationException::withMessages(['investor' => 'Investor profile already exists.']);
 //            }
             $this->profileFactoryService->createInvestor($user, $data);
+        }
 
+        // Ensure active_profile_type is set after profile creation
+        $user->ensureActiveProfileType();
+
+        // Handle FCM token if provided
+        if ($request->has('fcm_token')) {
+            try {
+                $user->addFcmToken(
+                    $request->fcm_token,
+                    $request->device_id,
+                    $request->platform,
+                    $request->app_version
+                );
+            } catch (\Exception $e) {
+                // Log error but don't fail registration
+                \Log::warning('Failed to register FCM token during registration', [
+                    'user_id' => $user->id,
+                    'error' => $e->getMessage()
+                ]);
+            }
         }
 
         $token = $this->UserAuthService->login($user);
-
-//        return response()->json([
-//            'message'=>'Registered successfully',
-//            'token' F => $token,
-//            'user'   => $user,
-//        ]);
+        $user->loadMissing('investorProfile', 'ownerProfile');
 
         return $this->respondSuccessWithData('Registered successfully', [
             'token'  => $token,
-            'user'   => $user,
-            'profiles' => [
-                'investor' => $user->hasInvestor(),
-                'owner' => $user->hasOwner(),
-            ],
+            'user'   => new UserResource($user),
+            'profiles' => $this->buildProfilesPayload($user),
             'active_profile_type' => $user->active_profile_type,
+            'notifications_enabled' => (bool) $user->notifications_enabled,
         ]);
     }
 
@@ -226,5 +304,130 @@ class UserAuthController extends Controller
         $user->save();
 
         return $this->respondSuccess('Password has been set successfully');
+    }
+
+    /**
+     * Switch between user profiles (investor/owner)
+     *
+     * @throws ValidationException
+     */
+    public function switchProfile(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $data = $request->validate([
+            'profile_type' => 'required|string|in:investor,owner',
+        ]);
+
+        $user = $request->user();
+
+        if (!$user) {
+            return $this->respondError('User not authenticated', 401);
+        }
+
+        try {
+            $user = $this->profileFactoryService->switch($user, $data['profile_type']);
+            $user->loadMissing('investorProfile', 'ownerProfile');
+
+            return $this->respondSuccessWithData('Profile switched successfully', [
+                'user' => new UserResource($user),
+                'profiles' => $this->buildProfilesPayload($user),
+                'active_profile_type' => $user->active_profile_type,
+            ]);
+        } catch (ValidationException $e) {
+            return $this->respondError($e->getMessage(), 422);
+        }
+    }
+
+    /**
+     * Logout user and revoke all tokens
+     */
+    public function logout(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return $this->respondError('User not authenticated', 401);
+        }
+
+        // Revoke all tokens for the user
+        $user->tokens()->delete();
+
+        // Deactivate all FCM tokens
+        $user->deactivateAllFcmTokens();
+
+        return $this->respondSuccess('Logged out successfully');
+    }
+
+    /**
+     * Request user account deletion
+     */
+    public function requestDeletion(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return $this->respondError('User not authenticated', 401);
+        }
+
+        $data = $request->validate([
+            'reason' => 'nullable|string|max:500'
+        ]);
+
+        // Create a new deletion request (don't update existing ones)
+        $deletionRequest = $user->requestDeletion($data['reason'] ?? null);
+
+        return $this->respondSuccessWithData('Deletion request submitted successfully', [
+            'request_id' => $deletionRequest->id,
+            'status' => $deletionRequest->status,
+            'requested_at' => $deletionRequest->requested_at,
+            'reason' => $deletionRequest->reason
+        ]);
+    }
+
+    /**
+     * Get user's deletion requests
+     */
+    public function getDeletionRequests(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return $this->respondError('User not authenticated', 401);
+        }
+
+        $deletionRequests = $user->deletionRequests()
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return $this->respondSuccessWithData('Deletion requests retrieved successfully', [
+            'requests' => $deletionRequests->map(function ($request) {
+                return [
+                    'id' => $request->id,
+                    'status' => $request->status,
+                    'reason' => $request->reason,
+                    'requested_at' => $request->requested_at,
+                    'processed_at' => $request->processed_at,
+                    'admin_notes' => $request->admin_notes
+                ];
+            })
+        ]);
+    }
+
+    protected function buildProfilesPayload(User $user): array
+    {
+        $user->loadMissing('investorProfile', 'ownerProfile');
+
+        $investorProfile = $user->investorProfile;
+        $ownerProfile = $user->ownerProfile;
+
+        return [
+            'investor' => [
+                'exists' => (bool) $investorProfile,
+                'data' => $investorProfile ? new InvestorProfileResource($investorProfile) : null,
+            ],
+            'owner' => [
+                'exists' => (bool) $ownerProfile,
+                'data' => $ownerProfile ? new OwnerProfileResource($ownerProfile) : null,
+            ],
+        ];
     }
 }

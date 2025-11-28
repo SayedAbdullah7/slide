@@ -6,8 +6,8 @@
     <div class="app-sidebar-logo px-6" id="kt_app_sidebar_logo">
         <!--begin::Logo image-->
         <a href="../../demo1/dist/index.html">
-            <img alt="Logo" src="assets/media/logos/default-dark.svg" class="h-25px app-sidebar-logo-default"/>
-            <img alt="Logo" src="assets/media/logos/default-small.svg" class="h-20px app-sidebar-logo-minimize"/>
+            <img alt="Logo" src="{{ asset('assets/media/logos/default-dark.svg') }}" class="h-25px app-sidebar-logo-default"/>
+            <img alt="Logo" src="{{ asset('assets/media/logos/default-small.svg') }}" class="h-20px app-sidebar-logo-minimize"/>
         </a>
         <!--end::Logo image-->
         <!--begin::Sidebar toggle-->
@@ -406,13 +406,71 @@ if (isset($_COOKIE["sidebar_minimize_state"]) && $_COOKIE["sidebar_minimize_stat
                     <!--end:Menu item-->
                     @php
                         $menuItems = [
-
+                            [
+                                'route' => 'admin.dashboard',
+                                'title' => 'Dashboard',
+                                'icon' => 'ki-element-11'
+                            ],
                             [
                                 'route' => 'user.index',
-                                'title' => 'users',
+                                'title' => 'Users',
                                 'icon' => 'ki-user'
                             ],
-                            // Add more items as needed
+                            [
+                                'route' => 'admin.investment-opportunities.index',
+                                'title' => 'Investment Opportunities',
+                                'icon' => 'ki-chart-line-up'
+                            ],
+                            [
+                                'route' => 'admin.investments.index',
+                                'title' => 'Investments',
+                                'icon' => 'ki-wallet'
+                            ],
+                            [
+                                'route' => 'admin.bank-transfers.index',
+                                'title' => 'Bank Transfers',
+                                'icon' => 'ki-arrow-down'
+                            ],
+                            [
+                                'route' => 'admin.withdrawals.index',
+                                'title' => 'Withdrawals',
+                                'icon' => 'ki-arrow-up'
+                            ],
+                            [
+                                'route' => 'admin.transactions.index',
+                                'title' => 'Transactions',
+                                'icon' => 'ki-dollar'
+                            ],
+                            [
+                                'route' => 'admin.contents.index',
+                                'title' => 'Content Management',
+                                'icon' => 'ki-document'
+                            ],
+                            [
+                                'route' => 'admin.faqs.index',
+                                'title' => 'FAQs',
+                                'icon' => 'ki-question'
+                            ],
+                            [
+                                'route' => 'admin.user-deletion-requests.index',
+                                'title' => 'User Deletion Requests',
+                                'icon' => 'ki-trash'
+                            ],
+                            [
+                                'route' => 'admin.contact-messages.index',
+                                'title' => 'Contact Messages',
+                                'icon' => 'ki-message-text'
+                            ],
+                            [
+                                'route' => 'admin.banks.index',
+                                'title' => 'Banks',
+                                'icon' => 'ki-bank'
+                            ],
+                            [
+                                'route' => 'admin.investment-categories.index',
+                                'title' => 'Investment Categories',
+                                'icon' => 'ki-category'
+                            ],
                         ];
                     @endphp
 
@@ -431,7 +489,7 @@ if (isset($_COOKIE["sidebar_minimize_state"]) && $_COOKIE["sidebar_minimize_stat
                                         <span class="path6"></span>
                                     </i>
                                 </span>
-                                <span class="menu-title text-capitalize">{{ $item['title'] }}</span>
+                                <span class="menu-title">{{ $item['title'] }}</span>
                             </a>
                         </div>
                         <!--end:Menu item-->

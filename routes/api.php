@@ -17,7 +17,7 @@ Route::get('/user', function (Request $request) {
 //Route::prefix('user')->group(function () {
 
 Route::get('/investment-opportunities', [\App\Http\Controllers\Api\InvestmentOpportunityController::class, 'index']);
-Route::get('/investor/home', [\App\Http\Controllers\Api\InvestmentOpportunityController::class, 'home'])->middleware('optional.auth');
+Route::get('/investor/home', [\App\Http\Controllers\Api\InvestmentOpportunityController::class, 'home'])->middleware('auth:sanctum');
 Route::post('/investor/invest', [\App\Http\Controllers\Api\InvestmentOpportunityController::class, 'invest'])->middleware('auth:sanctum');
 
 // Investment management routes
@@ -52,105 +52,154 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
         Route::post('/bulk-update-statuses', [\App\Http\Controllers\Admin\AdminInvestmentController::class, 'bulkUpdateStatuses']);
     });
 });
-    // Group all auth routes under /user/auth
-    Route::prefix('auth')->controller(UserAuthController::class)->group(function () {
+// Group all auth routes under /user/auth
+Route::prefix('auth')->controller(UserAuthController::class)->group(function () {
 
-        Route::get('check-phone', 'checkPhone')->name('user.auth.checkPhone');
+    Route::get('check-phone', 'checkPhone')->name('user.auth.checkPhone');
 
-        // POST /user/auth/send-otp
-        Route::post('send-otp', 'sendOtp')->name('user.auth.sendOtp');
+    // POST /user/auth/send-otp
+    Route::post('send-otp', 'sendOtp')->name('user.auth.sendOtp');
 
-        // POST /user/auth/verify-otp
-        Route::post('verify-otp', 'verifyOtp')->name('user.auth.verifyOtp');
+    // POST /user/auth/verify-otp
+    Route::post('verify-otp', 'verifyOtp')->name('user.auth.verifyOtp');
 
-        // POST /user/auth/register
-        Route::post('register', 'register')->name('user.auth.register');
+    // POST /user/auth/register (supports both authenticated and non-authenticated)
+    Route::post('register', 'register')->middleware('optional.auth')->name('user.auth.register');
 
-        // POST /user/auth/question
-    });
-    Route::get('auth/questions', [\App\Http\Controllers\SurveyQuestionController::class, 'index'])->name('user.auth.question');
+    // POST /user/auth/question
+});
+Route::get('auth/questions', [\App\Http\Controllers\SurveyQuestionController::class, 'index'])->name('user.auth.question');
 
-    Route::middleware('auth:sanctum')->put('auth/set-password', [UserAuthController::class, 'setPassword'])
-        ->name('user.auth.setPassword');
+Route::middleware('auth:sanctum')->put('auth/set-password', [UserAuthController::class, 'setPassword'])
+    ->name('user.auth.setPassword');
 
-    // PATCH /auth/switch-profile
-    Route::middleware('auth:sanctum')->patch('auth/switch-profile', [UserAuthController::class, 'switchProfile'])
-        ->name('user.auth.switchProfile');
+// PATCH /auth/switch-profile
+Route::middleware('auth:sanctum')->patch('auth/switch-profile', [UserAuthController::class, 'switchProfile'])
+    ->name('user.auth.switchProfile');
 
-    // POST /auth/logout
-    Route::middleware('auth:sanctum')->post('auth/logout', [UserAuthController::class, 'logout'])
-        ->name('user.auth.logout');
+// POST /auth/logout
+Route::middleware('auth:sanctum')->post('auth/logout', [UserAuthController::class, 'logout'])
+    ->name('user.auth.logout');
 
-    // POST /auth/request-deletion
-    Route::middleware('auth:sanctum')->delete('auth/request-deletion', [UserAuthController::class, 'requestDeletion']);
+// POST /auth/request-deletion
+Route::middleware('auth:sanctum')->delete('auth/request-deletion', [UserAuthController::class, 'requestDeletion']);
 
 
-    // Wallet API Routes
-    Route::middleware(['auth:sanctum'])->prefix('wallet')->controller(\App\Http\Controllers\Api\WalletController::class)->group(function () {
+// Wallet API Routes
+Route::middleware(['auth:sanctum'])->prefix('wallet')->controller(\App\Http\Controllers\Api\WalletController::class)->group(function () {
 
-        // Get wallet balance
-        Route::get('balance', 'getBalance')->name('api.wallet.balance');
+    // Get wallet screen (main wallet page)
+    Route::get('/', 'index')->name('api.wallet.index');
 
-        // Deposit money to wallet
-        Route::post('deposit', 'deposit')->name('api.wallet.deposit');
+    // Get quick actions
+    Route::get('quick-actions', 'getQuickActions')->name('api.wallet.quick-actions');
 
-        // Withdraw money from wallet
-        Route::post('withdraw', 'withdraw')->name('api.wallet.withdraw');
+    // Toggle balance visibility
+    Route::post('toggle-visibility', 'toggleBalanceVisibility')->name('api.wallet.toggle-visibility');
 
-        // Transfer money to another profile
-        Route::post('transfer', 'transfer')->name('api.wallet.transfer');
+    // Get wallet balance
+    Route::get('balance', 'getBalance')->name('api.wallet.balance');
 
-        // Get transaction history
-        Route::get('transactions', 'getTransactions')->name('api.wallet.transactions');
+    // Deposit money to wallet
+    Route::post('deposit', 'deposit')->name('api.wallet.deposit');
 
-        // Create wallet (if needed)
-        Route::post('create', 'createWallet')->name('api.wallet.create');
-    });
+    // Withdraw money from wallet
+    Route::post('withdraw', 'withdraw')->name('api.wallet.withdraw');
 
-    Route::prefix('investor')->group(function () {
+    // Transfer money to another profile
+    Route::post('transfer', 'transfer')->name('api.wallet.transfer');
+
+    // Get transaction history
+    Route::get('transactions', 'getTransactions')->name('api.wallet.transactions');
+
+    // Create wallet (if needed)
+    Route::post('create', 'createWallet')->name('api.wallet.create');
+});
+
+// Withdrawal API Routes
+Route::middleware(['auth:sanctum'])->prefix('withdrawal')->controller(\App\Http\Controllers\Api\WithdrawalController::class)->group(function () {
+
+    // Get available balance for withdrawal
+    Route::get('available-balance', 'getAvailableBalance')->name('api.withdrawal.available-balance');
+
+    // Get list of Saudi banks
+    Route::get('banks', 'getBanks')->name('api.withdrawal.banks');
+
+    // Get saved bank accounts
+    Route::get('bank-accounts', 'getBankAccounts')->name('api.withdrawal.bank-accounts');
+
+    // Add new bank account
+    Route::post('bank-accounts', 'addBankAccount')->name('api.withdrawal.bank-accounts.store');
+
+    // Delete bank account
+    Route::delete('bank-accounts/{bankAccountId}', 'deleteBankAccount')->name('api.withdrawal.bank-accounts.delete');
+
+    // Create withdrawal request
+    Route::post('request', 'createWithdrawalRequest')->name('api.withdrawal.request');
+
+    // Get withdrawal history
+    Route::get('history', 'getWithdrawalHistory')->name('api.withdrawal.history');
+});
+
+// Bank Transfer routes (Deposit via bank transfer)
+
+// Public route - Get company bank account details (no auth required)
+Route::get('bank-transfer/company-account', [\App\Http\Controllers\Api\BankTransferController::class, 'getCompanyBankAccount'])
+    ->name('api.bank-transfer.company-account');
+
+Route::middleware(['auth:sanctum'])->prefix('bank-transfer')->controller(\App\Http\Controllers\Api\BankTransferController::class)->group(function () {
+
+    // Submit bank transfer request with receipt
+    Route::post('request', 'submitBankTransfer')->name('api.bank-transfer.request');
+
+    // Get bank transfer request history
+    Route::get('history', 'getBankTransferHistory')->name('api.bank-transfer.history');
+});
+
+Route::prefix('investor')->group(function () {
     // Investment Opportunity Reminder API Routes
-        Route::middleware(['auth:sanctum'])->prefix('reminders')->controller(\App\Http\Controllers\Api\InvestmentOpportunityReminderController::class)->group(function () {
+    Route::middleware(['auth:sanctum'])->prefix('reminders')->controller(\App\Http\Controllers\Api\InvestmentOpportunityReminderController::class)->group(function () {
 
-            // Get all reminders for the authenticated investor
-            Route::get('/', 'index')->name('api.reminders.index');
+        // Get all reminders for the authenticated investor
+        Route::get('/', 'index')->name('api.reminders.index');
 
-            // Add a reminder for a coming investment opportunity
-            Route::post('/', 'store')->name('api.reminders.store');
+        // Add a reminder for a coming investment opportunity
+        Route::post('/', 'store')->name('api.reminders.store');
 
-            // Get coming opportunities that can have reminders
-            Route::get('coming-opportunities', 'comingOpportunities')->name('api.reminders.coming-opportunities');
+        // Get coming opportunities that can have reminders
+        Route::get('coming-opportunities', 'comingOpportunities')->name('api.reminders.coming-opportunities');
 
-            // Get reminder statistics
-            Route::get('stats', 'stats')->name('api.reminders.stats');
+        // Get reminder statistics
+        Route::get('stats', 'stats')->name('api.reminders.stats');
 
-            // Toggle reminder status (activate/deactivate)
-            Route::patch('{reminderId}/toggle', 'toggle')->name('api.reminders.toggle');
+        // Toggle reminder status (activate/deactivate)
+        Route::patch('{reminderId}/toggle', 'toggle')->name('api.reminders.toggle');
 
-            // Remove a reminder
-            Route::delete('{reminderId}', 'destroy')->name('api.reminders.destroy');
-        });
+        // Remove a reminder
+        Route::delete('{reminderId}', 'destroy')->name('api.reminders.destroy');
+    });
 
-        // Saved Investment Opportunities API Routes
-        Route::middleware(['auth:sanctum'])->prefix('saved-opportunities')->controller(\App\Http\Controllers\Api\SavedInvestmentOpportunityController::class)->group(function () {
+    // Saved Investment Opportunities API Routes
+    Route::middleware(['auth:sanctum'])->prefix('saved-opportunities')->controller(\App\Http\Controllers\Api\SavedInvestmentOpportunityController::class)->group(function () {
 
-            // Get all saved opportunities for the authenticated investor
-            Route::get('/', 'index')->name('api.saved-opportunities.index');
+        // Get all saved opportunities for the authenticated investor
+        Route::get('/', 'index')->name('api.saved-opportunities.index');
 
-            // Save an investment opportunity
-            Route::post('/', 'store')->name('api.saved-opportunities.store');
+        // Save an investment opportunity
+        Route::post('/', 'store')->name('api.saved-opportunities.store');
 
-            // Remove a saved investment opportunity
-            Route::delete('/', 'destroy')->name('api.saved-opportunities.destroy');
+        // Remove a saved investment opportunity
+        Route::delete('/', 'destroy')->name('api.saved-opportunities.destroy');
 
-            // Toggle save status of an investment opportunity
-            Route::post('toggle', 'toggle')->name('api.saved-opportunities.toggle');
+        // Toggle save status of an investment opportunity
+        Route::post('toggle', 'toggle')->name('api.saved-opportunities.toggle');
 
-            // Check save status for multiple opportunities
-            Route::post('check-status', 'checkStatus')->name('api.saved-opportunities.check-status');
+        // Check save status for multiple opportunities
+        Route::post('check-status', 'checkStatus')->name('api.saved-opportunities.check-status');
 
-            // Get save statistics
-            Route::get('stats', 'stats')->name('api.saved-opportunities.stats');
-        });
+        // Get save statistics
+        Route::get('stats', 'stats')->name('api.saved-opportunities.stats');
+    });
 
     // Statistics Dashboard API Routes
     Route::middleware(['auth:sanctum'])->prefix('statistics')->controller(\App\Http\Controllers\Api\StatisticsController::class)->group(function () {
@@ -169,35 +218,110 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
 
         // Get statistics comparison between periods
         Route::get('comparison', 'getStatisticsComparison')->name('api.statistics.comparison');
-
     });
 });
 
+// Owner Investment Opportunity Request API Routes
+Route::middleware(['auth:sanctum'])->prefix('owner')->group(function () {
+    Route::prefix('opportunity-requests')->controller(\App\Http\Controllers\Api\OwnerOpportunityRequestController::class)->group(function () {
+        // Get all opportunity requests for the authenticated owner
+        Route::get('/', 'index')->name('api.owner.opportunity-requests.index');
 
-    // FCM Token Management API Routes
-    Route::middleware(['auth:sanctum'])->prefix('fcm')->controller(\App\Http\Controllers\Api\FcmTokenController::class)->group(function () {
+        // Submit a new opportunity request
+        Route::post('/', 'store')->name('api.owner.opportunity-requests.store');
 
-        // Register FCM token
-        Route::post('register', 'register')->name('api.fcm.register');
+        // Get a specific opportunity request
+        Route::get('/{id}', 'show')->name('api.owner.opportunity-requests.show');
 
-        // Get all FCM tokens for user
-        Route::get('tokens', 'index')->name('api.fcm.tokens');
+        // Update an opportunity request
+        Route::put('/{id}', 'update')->name('api.owner.opportunity-requests.update');
 
-        // Update FCM token
-        Route::put('tokens/{tokenId}', 'update')->name('api.fcm.update');
+        // Delete an opportunity request
+        Route::delete('/{id}', 'destroy')->name('api.owner.opportunity-requests.destroy');
 
-        // Remove FCM token
-        Route::delete('tokens', 'remove')->name('api.fcm.remove');
+        // Get available guarantee types
+        // Route::get('/guarantee-types', 'getGuaranteeTypes')->name('api.owner.opportunity-requests.guarantee-types');
 
-        // Test notification
-        Route::post('test', 'testNotification')->name('api.fcm.test');
+        // Get available request statuses
+        // move
+        Route::get('/statuses', 'getStatuses')->name('api.owner.opportunity-requests.statuses');
 
-        // Get notification statistics
-        Route::get('stats', 'stats')->name('api.fcm.stats');
+        // Get request statistics
+        Route::get('/statistics', 'getStatistics')->name('api.owner.opportunity-requests.statistics');
 
-        // Deactivate all tokens
-        Route::post('deactivate-all', 'deactivateAll')->name('api.fcm.deactivate-all');
+        // Dashboard API route
+
     });
+    Route::middleware(['auth:sanctum'])->get('/home', [\App\Http\Controllers\Api\OwnerOpportunityRequestController::class, 'getDashboard'])->name('api.owner.dashboard');
+
+    // Owner Investment Opportunity API Routes
+    Route::middleware(['auth:sanctum'])->prefix('investment-opportunities')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Api\OwnerInvestmentOpportunityController::class, 'index'])->name('api.owner.investment-opportunities.index');
+    });
+
+
+
+    // Route::middleware(['auth:sanctum'])->prefix('owner')->group(function () {
+    // Get guarantee-types
+    Route::get('/guarantee-types', [\App\Http\Controllers\Api\OwnerOpportunityRequestController::class, 'getGuaranteeTypes'])->name('api.owner.opportunity-requests.guarantee-types');
+    // });
+});
+
+// FCM Token Management API Routes
+Route::middleware(['auth:sanctum'])->prefix('fcm')->controller(\App\Http\Controllers\Api\FcmTokenController::class)->group(function () {
+
+    // Register FCM token
+    Route::post('register', 'register')->name('api.fcm.register');
+
+    // Get all FCM tokens for user
+    Route::get('tokens', 'index')->name('api.fcm.tokens');
+
+    // Update FCM token
+    Route::put('tokens/{tokenId}', 'update')->name('api.fcm.update');
+
+    // Remove FCM token
+    Route::delete('tokens', 'remove')->name('api.fcm.remove');
+
+    // Test notification
+    Route::post('test', 'testNotification')->name('api.fcm.test');
+
+    // Get notification statistics
+    Route::get('stats', 'stats')->name('api.fcm.stats');
+
+    // Deactivate all tokens
+    Route::post('deactivate-all', 'deactivateAll')->name('api.fcm.deactivate-all');
+});
+
+// Notifications API Routes
+Route::middleware(['auth:sanctum'])->prefix('notifications')->controller(\App\Http\Controllers\Api\NotificationController::class)->group(function () {
+
+    // Get user's notifications
+    Route::get('/', 'index')->name('api.notifications.index');
+
+    // Get unread notifications count
+    Route::get('unread-count', 'unreadCount')->name('api.notifications.unread-count');
+
+    // Get notification statistics
+    Route::get('stats', 'stats')->name('api.notifications.stats');
+
+    // Get notification settings
+    Route::get('settings', 'getSettings')->name('api.notifications.settings');
+
+    // Update notification settings
+    Route::post('settings', 'updateSettings')->name('api.notifications.update-settings');
+
+    // Mark notification as read
+    Route::post('{id}/read', 'markAsRead')->name('api.notifications.mark-as-read');
+
+    // Mark all notifications as read
+    Route::post('mark-all-read', 'markAllAsRead')->name('api.notifications.mark-all-read');
+
+    // Delete notification
+    Route::delete('delete/{id}', 'destroy')->name('api.notifications.destroy');
+
+    // Delete all notifications
+    Route::delete('delete_all', 'deleteAll')->name('api.notifications.delete-all');
+});
 
 // Content API Routes (Public - no authentication required)
 Route::prefix('content')->controller(ContentController::class)->group(function () {
@@ -219,6 +343,64 @@ Route::prefix('content')->controller(ContentController::class)->group(function (
 
     // Get all content in one response
     Route::get('all', 'allContent')->name('api.content.all');
+});
+
+// Contact API Routes
+Route::prefix('contact')->controller(\App\Http\Controllers\Api\ContactController::class)->group(function () {
+
+    // Submit contact message (public - no authentication required)
+    Route::post('/', 'store')->name('api.contact.store');
+
+    // Get user's contact messages (requires authentication)
+    Route::middleware('auth:sanctum')->get('/', 'index')->name('api.contact.index');
+
+    // Get specific contact message details (requires authentication)
+    Route::middleware('auth:sanctum')->get('{id}', 'show')->name('api.contact.show');
+});
+
+// Payment API Routes (Authenticated)
+Route::prefix('payments')->middleware('auth:sanctum')->controller(\App\Http\Controllers\Api\PaymentController::class)->group(function () {
+
+    // Create investment payment intention
+    Route::post('intentions', 'createIntention')->name('api.payments.intentions.create');
+
+    // Create wallet charging intention
+    Route::post('wallet-intentions', 'createWalletIntention')->name('api.payments.wallet-intentions.create');
+
+    // Create investment payment intention
+    Route::post('investment-intentions', 'createInvestmentIntention')->name('api.payments.investment-intentions.create');
+
+    // Get user's payment intentions list
+    Route::get('intentions', 'getIntentions')->name('api.payments.intentions.index');
+
+    // Get user's payment transactions list
+    Route::get('transactions', 'getTransactions')->name('api.payments.transactions.index');
+
+    // Get payment statistics
+    Route::get('stats', 'getPaymentStats')->name('api.payments.stats');
+
+    // Get payment logs
+    Route::get('logs', 'getPaymentLogs')->name('api.payments.logs');
+});
+
+// User Saved Cards API Route (Authenticated)
+Route::prefix('cards')->middleware('auth:sanctum')->controller(\App\Http\Controllers\Api\UserCardController::class)->group(function () {
+
+    // Get list of user's saved cards
+    Route::get('/', 'index')->name('api.cards.index');
+});
+
+// Paymob Webhooks (Public - no authentication)
+Route::prefix('paymob')->controller(\App\Http\Controllers\Api\PaymentWebhookController::class)->group(function () {
+
+    // Main webhook - handles both TRANSACTION and TOKEN types
+    Route::post('webhook', 'handlePaymobWebhook')->name('api.paymob.webhook');
+
+    // Notification webhook - TRANSACTION type (optional specific endpoint)
+    Route::post('notification', 'notification')->name('api.paymob.notification');
+
+    // Tokenized callback - TOKEN type (optional specific endpoint)
+    Route::post('tokenized-callback', 'tokenizedCallback')->name('api.paymob.tokenized-callback');
 });
 
 //});

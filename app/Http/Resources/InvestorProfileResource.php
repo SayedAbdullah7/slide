@@ -14,6 +14,16 @@ class InvestorProfileResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        return parent::toArray($request);
+        return [
+            'id' => $this->id,
+            'user_id' => $this->user_id,
+            'full_name' => $this->full_name,
+            'birth_date' => $this->birth_date,
+            'national_id' => $this->national_id,
+            // 'has_wallet' => $this->hasWallet(),
+            // 'wallet_balance' => $this->getWalletBalance(),
+            'created_at' => $this->created_at,
+            'updated_at' => $this->updated_at,
+        ];
     }
 }

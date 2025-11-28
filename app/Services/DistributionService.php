@@ -5,10 +5,47 @@ namespace App\Services;
 use App\Models\Investment;
 use App\Models\InvestmentOpportunity;
 use App\Models\InvestorProfile;
+use App\Models\InvestmentDistribution;
 use Illuminate\Support\Facades\DB;
 use Exception;
 
-// for authorize investments
+/**
+ * DistributionService - Service for managing investment profit distributions
+ *
+ * This service handles the distribution of profits from investment opportunities to investors.
+ * It specifically focuses on "authorize" type investments where actual returns have been recorded.
+ *
+ * ## Service Role:
+ * - Distributes profits to investor wallets when actual returns are recorded
+ * - Manages distribution records and tracks distribution status
+ * - Provides statistics and reporting on distribution activities
+ * - Handles distribution history and audit trails
+ *
+ * ## Distribution Conditions:
+ * - Only processes "authorize" type investments (not "myself" type)
+ * - Requires actual_net_profit_per_share to be recorded (not null)
+ * - Investment must not be already distributed (distribution_status != 'distributed')
+ * - All distributions are recorded with timestamps and metadata
+ *
+ * ## Distribution Process:
+ * 1. Validates investment eligibility (authorize type, has actual returns, not distributed)
+ * 2. Creates distribution record in InvestmentDistribution table
+ * 3. Deposits profit amount to investor's wallet via WalletService
+ * 4. Updates investment status to 'distributed' with distribution details
+ * 5. Logs the distribution activity for audit purposes
+ *
+ * ## Key Methods:
+ * - distributeReturns(): Distribute returns for a single investment
+ * - distributeOpportunityReturns(): Distribute returns for all eligible investments in an opportunity
+ * - getDistributionStatistics(): Get distribution statistics for an opportunity
+ * - getInvestmentsReadyForDistribution(): Get investments ready for distribution
+ * - getDistributedInvestments(): Get already distributed investments
+ * - getInvestorDistributionHistory(): Get distribution history for a specific investor
+ *
+ * @package App\Services
+ * @author AI Assistant
+ * @version 1.0
+ */
 class DistributionService
 {
     protected $walletService;
@@ -33,6 +70,13 @@ class DistributionService
         }
 
         return DB::transaction(function () use ($investment, $amount, $description) {
+            // Create distribution record
+            $distribution = InvestmentDistribution::create([
+                'investment_id' => $investment->id,
+                'distributed_amount' => $amount,
+                'is_distributed' => false,
+            ]);
+
             // Deposit to investor's wallet
             $this->walletService->depositToWallet(
                 $investment->investor,
@@ -40,22 +84,39 @@ class DistributionService
                 [
                     'type' => 'returns_distribution',
                     'investment_id' => $investment->id,
+                    'distribution_id' => $distribution->id,
                     'opportunity_id' => $investment->opportunity_id,
                     'opportunity_name' => $investment->opportunity->name,
                     'description' => $description ?? "توزيع عوائد من فرصة: {$investment->opportunity->name}",
                 ]
             );
 
-            // Update investment distribution status
+            // Mark distribution as completed
+            $distribution->markAsDistributed();
+
+            // Update investment distribution status and mark as completed
             $investment->update([
                 'distribution_status' => 'distributed',
-                'distributed_amount' => $amount,
+                'distributed_profit' => $amount,
                 'distributed_at' => now(),
+                'status' => 'completed',
             ]);
+
+            // Send notification to user
+            $user = $investment->investor->user;
+            if ($user) {
+                $balance = $this->walletService->getWalletBalance($investment->investor);
+                $user->notify(new \App\Notifications\ProfitDistributedNotification(
+                    $investment,
+                    $amount,
+                    $balance
+                ));
+            }
 
             // Log the distribution
             \Log::info('Returns distributed to investor', [
                 'investment_id' => $investment->id,
+                'distribution_id' => $distribution->id,
                 'investor_id' => $investment->investor_id,
                 'opportunity_id' => $investment->opportunity_id,
                 'distributed_amount' => $amount,
@@ -66,52 +127,31 @@ class DistributionService
     }
 
     /**
-     * Distribute returns for all investments in an opportunity
-     * توزيع العوائد لجميع الاستثمارات في فرصة معينة
+     * Distribute returns for all investments in an opportunity (authorize type only)
      */
-    public function distributeOpportunityReturns(InvestmentOpportunity $opportunity): array
+    public function distributeOpportunityReturns(InvestmentOpportunity $opportunity)
     {
         $results = [
-            'myself_investments' => 0,
             'authorize_investments' => 0,
             'total_distributed' => 0,
             'errors' => [],
         ];
 
-        // Distribute for myself investments (merchandise arrived)
-        $myselfInvestments = $opportunity->investments()
-            ->where('investment_type', 'myself')
-            ->where('merchandise_status', 'arrived')
-            ->where('distribution_status', '!=', 'distributed')
-            ->get();
-
-        foreach ($myselfInvestments as $investment) {
-            try {
-                $expectedReturns = $this->calculateExpectedReturnsForDistribution($investment);
-                $this->distributeReturns($investment, $expectedReturns['net_return'], 'توزيع عوائد بضائع واصلة');
-                $results['myself_investments']++;
-                $results['total_distributed'] += $expectedReturns['net_return'];
-            } catch (Exception $e) {
-                $results['errors'][] = [
-                    'investment_id' => $investment->id,
-                    'type' => 'myself',
-                    'error' => $e->getMessage(),
-                ];
-            }
-        }
-
-        // Distribute for authorize investments (actual returns recorded)
-        $authorizeInvestments = $opportunity->investments()
-            ->where('investment_type', 'authorize')
-            ->whereNotNull('actual_net_return')
-            ->where('distribution_status', '!=', 'distributed')
+        // Use existing relationship and scope for authorize investments
+        $authorizeInvestments = $opportunity->investmentsAuthorize()
+            ->readyForDistribution()
             ->get();
 
         foreach ($authorizeInvestments as $investment) {
             try {
-                $this->distributeReturns($investment, $investment->actual_net_return, 'توزيع عوائد مبيعات مفوضة');
+                $investment->actual_net_profit_per_share = $opportunity->actual_net_profit_per_share;
+
+                // توزيع الأصل المدفوع مع الربح
+                $totalAmountToDistribute = $investment->getTotalActualReturns();
+
+                $this->distributeReturns($investment, $totalAmountToDistribute, 'توزيع عوائد مبيعات مفوضة');
                 $results['authorize_investments']++;
-                $results['total_distributed'] += $investment->actual_net_return;
+                $results['total_distributed'] += $totalAmountToDistribute;
             } catch (Exception $e) {
                 $results['errors'][] = [
                     'investment_id' => $investment->id,
@@ -125,98 +165,68 @@ class DistributionService
     }
 
     /**
-     * Calculate expected returns for distribution (myself type)
-     * حساب العوائد المتوقعة للتوزيع (نوع بيع بنفسي)
-     */
-    protected function calculateExpectedReturnsForDistribution(Investment $investment): array
-    {
-        $opportunity = $investment->opportunity;
-        $shares = $investment->shares;
-
-        $expectedReturnAmount = $shares * ($opportunity->expected_return_amount_by_myself ?? 0);
-        $expectedNetReturn = $shares * ($opportunity->expected_net_return_by_myself ?? 0);
-        $shippingAndServiceFee = $shares * ($opportunity->shipping_and_service_fee ?? 0);
-
-        return [
-            'return_amount' => $expectedReturnAmount,
-            'net_return' => $expectedNetReturn,
-            'shipping_and_service_fee' => $shippingAndServiceFee,
-        ];
-    }
-
-    /**
-     * Get distribution statistics for an opportunity
-     * الحصول على إحصائيات التوزيع لفرصة معينة
+     * Get distribution statistics for an opportunity (authorize type only)
+     * الحصول على إحصائيات التوزيع لفرصة معينة (نوع مفوض فقط)
      */
     public function getDistributionStatistics(InvestmentOpportunity $opportunity): array
     {
-        $totalInvestments = $opportunity->investments()->count();
-        $distributedInvestments = $opportunity->investments()
-            ->where('distribution_status', 'distributed')
+        // Use existing relationship for authorize investments
+        $totalAuthorizeInvestments = $opportunity->investmentsAuthorize()->count();
+
+        $distributedAuthorizeInvestments = $opportunity->investmentsAuthorize()
+            ->statusDistributed()
             ->count();
 
-        $totalDistributedAmount = $opportunity->investments()
-            ->where('distribution_status', 'distributed')
-            ->sum('distributed_amount');
+        $totalDistributedAmount = $opportunity->investmentsAuthorize()
+            ->statusDistributed()
+            ->sum('distributed_profit');
 
-        $myselfInvestments = $opportunity->investments()
-            ->where('investment_type', 'myself')
-            ->where('merchandise_status', 'arrived')
-            ->count();
-
-        $authorizeInvestments = $opportunity->investments()
-            ->where('investment_type', 'authorize')
-            ->whereNotNull('actual_net_return')
+        $authorizeInvestmentsReady = $opportunity->investmentsAuthorize()
+            ->readyForDistribution()
             ->count();
 
         return [
-            'total_investments' => $totalInvestments,
-            'distributed_investments' => $distributedInvestments,
-            'pending_distribution' => $totalInvestments - $distributedInvestments,
+            'total_investments' => $totalAuthorizeInvestments,
+            'distributed_investments' => $distributedAuthorizeInvestments,
+            'pending_distribution' => $totalAuthorizeInvestments - $distributedAuthorizeInvestments,
             'total_distributed_amount' => $totalDistributedAmount,
             'ready_for_distribution' => [
-                'myself_investments' => $myselfInvestments,
-                'authorize_investments' => $authorizeInvestments,
+                'authorize_investments' => $authorizeInvestmentsReady,
             ],
-            'distribution_completion_rate' => $totalInvestments > 0
-                ? round(($distributedInvestments / $totalInvestments) * 100, 2)
+            'distribution_completion_rate' => $totalAuthorizeInvestments > 0
+                ? round(($distributedAuthorizeInvestments / $totalAuthorizeInvestments) * 100, 2)
                 : 0,
         ];
     }
 
     /**
-     * Get investments ready for distribution
-     * الحصول على الاستثمارات الجاهزة للتوزيع
+     * Get investments ready for distribution (authorize type only)
+     * الحصول على الاستثمارات الجاهزة للتوزيع (نوع مفوض فقط)
      */
     public function getInvestmentsReadyForDistribution(InvestmentOpportunity $opportunity = null)
     {
-        $query = Investment::where('distribution_status', '!=', 'distributed')
+        $query = Investment::readyForDistribution()
             ->with(['opportunity', 'investor.user']);
 
         if ($opportunity) {
-            $query->where('opportunity_id', $opportunity->id);
+            $query->forOpportunity($opportunity->id);
         }
 
-        return $query->get()->filter(function ($investment) {
-            if ($investment->investment_type === 'myself') {
-                return $investment->merchandise_status === 'arrived';
-            } else {
-                return $investment->actual_net_return !== null;
-            }
-        });
+        return $query->get();
     }
 
     /**
-     * Get distributed investments
-     * الحصول على الاستثمارات الموزعة
+     * Get distributed investments (authorize type only)
+     * الحصول على الاستثمارات الموزعة (نوع مفوض فقط)
      */
     public function getDistributedInvestments(InvestmentOpportunity $opportunity = null)
     {
-        $query = Investment::where('distribution_status', 'distributed')
+        $query = Investment::authorize()
+            ->statusDistributed()
             ->with(['opportunity', 'investor.user']);
 
         if ($opportunity) {
-            $query->where('opportunity_id', $opportunity->id);
+            $query->forOpportunity($opportunity->id);
         }
 
         return $query->get();
@@ -235,13 +245,14 @@ class DistributionService
     }
 
     /**
-     * Get distribution history for an investor
-     * الحصول على تاريخ التوزيع لمستثمر معين
+     * Get distribution history for an investor (authorize type only)
+     * الحصول على تاريخ التوزيع لمستثمر معين (نوع مفوض فقط)
      */
     public function getInvestorDistributionHistory(InvestorProfile $investor, int $perPage = 15)
     {
         return $investor->investments()
-            ->where('distribution_status', 'distributed')
+            ->authorize()
+            ->statusDistributed()
             ->with(['opportunity'])
             ->orderBy('distributed_at', 'desc')
             ->paginate($perPage);

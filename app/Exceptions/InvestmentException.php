@@ -110,6 +110,29 @@ class InvestmentException extends Exception
     }
 
     /**
+     * Create processing failed exception
+     * إنشاء استثناء فشل المعالجة
+     */
+    public static function processingFailed(string $reason = ''): self
+    {
+        $message = 'حدث خطأ أثناء معالجة الاستثمار';
+        if ($reason) {
+            $message .= ': ' . $reason;
+        }
+
+        return new self($message, 500, 'PROCESSING_FAILED');
+    }
+
+    /**
+     * Create insufficient shares exception
+     * إنشاء استثناء الأسهم غير كافية
+     */
+    public static function insufficientShares(int $availableShares): self
+    {
+        return new self("الأسهم المتاحة غير كافية. المتاح: {$availableShares} سهم", 400, 'INSUFFICIENT_SHARES_AVAILABLE');
+    }
+
+    /**
      * Get the response array for API
      * الحصول على مصفوفة الاستجابة للـ API
      */

@@ -8,6 +8,57 @@ use App\Models\InvestorProfile;
 use Illuminate\Support\Facades\DB;
 use Exception;
 
+/**
+ * AdminInvestmentService - Service for administrative investment management
+ *
+ * This service provides comprehensive administrative functionality for managing investments,
+ * opportunities, and related processes. It orchestrates other services (MerchandiseService,
+ * ReturnsService, DistributionService) to provide high-level administrative operations.
+ *
+ * ## Service Role:
+ * - Provides dashboard statistics and analytics
+ * - Orchestrates investment lifecycle management
+ * - Handles bulk operations and administrative tasks
+ * - Manages opportunity lifecycle and investment processing
+ * - Provides performance analytics and reporting
+ *
+ * ## Administrative Operations:
+ * - Dashboard statistics and KPIs
+ * - Investment lifecycle management (merchandise → returns → distribution)
+ * - Bulk status updates and administrative actions
+ * - Performance analytics for investors and opportunities
+ * - Financial summaries and reporting
+ *
+ * ## Key Administrative Processes:
+ * 1. **Dashboard Management**: Comprehensive statistics and KPIs
+ * 2. **Merchandise Processing**: Mark merchandise as arrived for myself investments
+ * 3. **Returns Recording**: Record actual returns for authorize investments
+ * 4. **Distribution Processing**: Distribute profits to investor wallets
+ * 5. **Performance Analytics**: Track investor and opportunity performance
+ * 6. **Bulk Operations**: Mass updates and administrative actions
+ *
+ * ## Service Dependencies:
+ * - MerchandiseService: For merchandise delivery management
+ * - ReturnsService: For actual returns recording
+ * - DistributionService: For profit distribution
+ *
+ * ## Key Methods:
+ * - getDashboardStatistics(): Get comprehensive dashboard data
+ * - getOpportunityManagementData(): Get complete opportunity management data
+ * - processMerchandiseDelivery(): Process merchandise delivery for opportunity
+ * - processActualProfitPerShareRecording(): Record actual returns for opportunity
+ * - processReturnsDistribution(): Distribute returns for opportunity
+ * - getInvestmentsRequiringAttention(): Get investments needing admin action
+ * - getInvestmentLifecycleStatus(): Get lifecycle status for opportunity
+ * - getInvestorPerformanceData(): Get investor performance analytics
+ * - getOpportunityPerformanceData(): Get opportunity performance analytics
+ * - bulkUpdateInvestmentStatuses(): Bulk update investment statuses
+ * - getFinancialSummary(): Get financial summary for date range
+ *
+ * @package App\Services
+ * @author AI Assistant
+ * @version 1.0
+ */
 class AdminInvestmentService
 {
     protected $merchandiseService;
@@ -31,15 +82,15 @@ class AdminInvestmentService
     public function getDashboardStatistics(): array
     {
         $totalOpportunities = InvestmentOpportunity::count();
-        $activeOpportunities = InvestmentOpportunity::where('status', 'open')->count();
-        $completedOpportunities = InvestmentOpportunity::where('status', 'completed')->count();
+        $activeOpportunities = InvestmentOpportunity::status('open')->count();
+        $completedOpportunities = InvestmentOpportunity::status('completed')->count();
 
         $totalInvestments = Investment::count();
-        $activeInvestments = Investment::where('status', 'active')->count();
-        $completedInvestments = Investment::where('status', 'completed')->count();
+        $activeInvestments = Investment::active()->count();
+        $completedInvestments = Investment::completed()->count();
 
-        $totalInvestmentAmount = Investment::sum('amount');
-        $totalDistributedAmount = Investment::where('distribution_status', 'distributed')->sum('distributed_amount');
+        $totalInvestmentAmount = Investment::sum('total_investment');
+        $totalDistributedAmount = Investment::statusDistributed()->sum('distributed_profit');
 
         return [
             'opportunities' => [
@@ -76,8 +127,8 @@ class AdminInvestmentService
             'returns' => $returnsStats,
             'distribution' => $distributionStats,
             'investments' => [
-                'myself' => $opportunity->investments()->where('investment_type', 'myself')->get(),
-                'authorize' => $opportunity->investments()->where('investment_type', 'authorize')->get(),
+                'myself' => $opportunity->investmentsMyself()->get(),
+                'authorize' => $opportunity->investmentsAuthorize()->get(),
             ],
         ];
     }
@@ -106,13 +157,13 @@ class AdminInvestmentService
     }
 
     /**
-     * Process actual returns recording for an opportunity
-     * معالجة تسجيل العوائد الفعلية لفرصة معينة
+     * Process actual profit per share recording for an opportunity
+     * معالجة تسجيل الربح الفعلي لكل سهم لفرصة معينة
      */
-    public function processActualReturnsRecording(InvestmentOpportunity $opportunity, array $returnsData): array
+    public function processActualProfitPerShareRecording(InvestmentOpportunity $opportunity, array $profitData): array
     {
         try {
-            $recordedCount = $this->returnsService->recordOpportunityActualReturns($opportunity, $returnsData);
+            $recordedCount = $this->returnsService->recordOpportunityActualProfitPerShare($opportunity, $profitData);
 
             return [
                 'success' => true,
@@ -139,7 +190,7 @@ class AdminInvestmentService
 
             return [
                 'success' => true,
-                'message' => "تم توزيع العوائد لـ {$results['myself_investments']} استثمار بيع بنفسي و {$results['authorize_investments']} استثمار مفوض",
+                'message' => "تم توزيع العوائد لـ {$results['authorize_investments']} استثمار مفوض",
                 'results' => $results,
             ];
         } catch (Exception $e) {
@@ -170,8 +221,8 @@ class AdminInvestmentService
      */
     public function getInvestmentLifecycleStatus(InvestmentOpportunity $opportunity): array
     {
-        $myselfInvestments = $opportunity->investments()->where('investment_type', 'myself')->get();
-        $authorizeInvestments = $opportunity->investments()->where('investment_type', 'authorize')->get();
+        $myselfInvestments = $opportunity->investmentsMyself()->get();
+        $authorizeInvestments = $opportunity->investmentsAuthorize()->get();
 
         $myselfStatus = [
             'total' => $myselfInvestments->count(),
@@ -182,8 +233,8 @@ class AdminInvestmentService
 
         $authorizeStatus = [
             'total' => $authorizeInvestments->count(),
-            'pending_returns' => $authorizeInvestments->whereNull('actual_return_amount')->count(),
-            'returns_recorded' => $authorizeInvestments->whereNotNull('actual_return_amount')->count(),
+            'pending_returns' => $authorizeInvestments->whereNull('actual_profit_per_share')->count(),
+            'returns_recorded' => $authorizeInvestments->whereNotNull('actual_profit_per_share')->count(),
             'distributed' => $authorizeInvestments->where('distribution_status', 'distributed')->count(),
         ];
 
@@ -214,8 +265,8 @@ class AdminInvestmentService
     {
         return InvestorProfile::with(['user', 'investments.opportunity'])
             ->withCount(['investments'])
-            ->withSum('investments', 'amount')
-            ->withSum('investments', 'distributed_amount')
+            ->withSum('investments', 'total_investment')
+            ->withSum('investments', 'distributed_profit')
             ->orderBy('investments_sum_amount', 'desc')
             ->paginate($perPage);
     }
@@ -228,8 +279,8 @@ class AdminInvestmentService
     {
         return InvestmentOpportunity::with(['category', 'ownerProfile.user'])
             ->withCount(['investments'])
-            ->withSum('investments', 'amount')
-            ->withSum('investments', 'distributed_amount')
+            ->withSum('investments', 'total_investment')
+            ->withSum('investments', 'distributed_profit')
             ->orderBy('investments_sum_amount', 'desc')
             ->paginate($perPage);
     }
@@ -259,6 +310,38 @@ class AdminInvestmentService
     }
 
     /**
+     * Process actual profit per share for all authorize investments in an opportunity
+     * معالجة الربح الفعلي لكل سهم لجميع الاستثمارات المفوضة في فرصة معينة
+     */
+    public function processActualProfitForAllAuthorizeInvestments(
+        InvestmentOpportunity $opportunity,
+        float $actualProfitPerShare,
+        float $actualNetProfitPerShare
+    ): array {
+        try {
+            $result = $this->returnsService->recordActualProfitForAllAuthorizeInvestments(
+                $opportunity,
+                $actualProfitPerShare,
+                $actualNetProfitPerShare
+            );
+
+            return [
+                'success' => $result['success'],
+                'message' => $result['success']
+                    ? "تم تسجيل الربح الفعلي لـ {$result['recorded_count']} استثمار مفوض من أصل {$result['total_authorize_investments']}"
+                    : 'لم يتم تسجيل أي استثمار',
+                'data' => $result,
+            ];
+        } catch (Exception $e) {
+            return [
+                'success' => false,
+                'message' => 'فشل في تسجيل الربح الفعلي للاستثمارات المفوضة: ' . $e->getMessage(),
+                'error' => $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
      * Get financial summary for date range
      * الحصول على ملخص مالي لفترة زمنية
      */
@@ -274,9 +357,9 @@ class AdminInvestmentService
             ],
             'investments' => [
                 'count' => $investments->count(),
-                'total_amount' => $investments->sum('amount'),
-                'distributed_amount' => $investments->sum('distributed_amount'),
-                'pending_distribution' => $investments->sum('amount') - $investments->sum('distributed_amount'),
+                'total_amount' => $investments->sum('total_investment'),
+                'distributed_amount' => $investments->sum('distributed_profit'),
+                'pending_distribution' => $investments->sum('total_investment') - $investments->sum('distributed_profit'),
             ],
             'opportunities' => [
                 'count' => $opportunities->count(),

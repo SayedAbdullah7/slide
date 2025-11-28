@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\InvestmentOpportunityResource;
 use App\Http\Traits\Helpers\ApiResponseTrait;
 use App\Models\InvestmentOpportunity;
+use App\Models\PaymentLog;
 use App\Services\InvestmentOpportunityService;
 use App\Services\InvestmentService;
 use Illuminate\Http\Request;
@@ -14,12 +15,12 @@ use Illuminate\Support\Facades\Auth;
 class InvestmentOpportunityController extends Controller
 {
     use ApiResponseTrait;
-    protected $service;
 
-    public function __construct(InvestmentOpportunityService $service)
-    {
-        $this->service = $service;
-    }
+    public function __construct(
+        protected InvestmentOpportunityService $service,
+        protected InvestmentService $investmentService,
+        protected \App\Services\PaymentService $paymentService
+    ) {}
 
     /**
      * Display a listing of the resource.
@@ -77,12 +78,20 @@ class InvestmentOpportunityController extends Controller
         // Validate request input
         try {
             $data = $request->validate([
-                'investment_opportunity_id' => 'required|exists:investment_opportunities,id',
+                // 'investment_opportunity_id' => 'required|exists:investment_opportunities,id',
+                'investment_opportunity_id' => 'required',
                 'shares' => 'required|integer|min:1',
                 'type' => 'required|string|in:myself,authorize',
+                'pay_by' => 'nullable|string|in:card,apple_pay,wallet,online',
+                // 'payment_method' => 'nullable|string|in:card,apple_pay,wallet',
             ]);
         } catch (\Illuminate\Validation\ValidationException $e) {
             return $this->respondValidationErrors($e);
+        }
+
+        $pay_by = $request->input('pay_by', 'wallet');
+        if($pay_by == 'online'){
+            $pay_by = 'card';
         }
 
         // Get investor profile
@@ -95,21 +104,70 @@ class InvestmentOpportunityController extends Controller
         $opportunity = InvestmentOpportunity::findOrFail($data['investment_opportunity_id']);
 
         try {
-            $investmentService = app()->make(InvestmentService::class);
-            $investment = $investmentService->invest($investor, $opportunity, $data['shares'], $data['type']);
+            // If online payment, validate first then create payment intention
+            if ($pay_by === 'card' || $pay_by === 'apple_pay') {
+                return $this->handleOnlinePayment($investor, $opportunity, $data, $pay_by);
+            }
 
-            return $this->respondCreated([
-                'success' => true,
-                'message' => 'تم شراء الأسهم بنجاح', // Investment successfully created
-                'result' => $investment,
-            ]);
-//use ApiResponseTrait in all responses
+            // If wallet payment, process immediately
+            return $this->handleWalletPayment($investor, $opportunity, $data);
+
         } catch (\App\Exceptions\InvestmentException $e) {
             return $this->respondError($e->getMessage(), $e->getStatusCode(), error_code: $e->getErrorCode());
         } catch (\Exception $e) {
-            return $this->respondBadRequest('حدث خطأ أثناء معالجة الاستثمار: ' . $e->getMessage()); // Error occurred while processing investment
+            PaymentLog::error('Investment process failed', [
+                'opportunity_id' => $data['investment_opportunity_id'],
+                'shares' => $data['shares'],
+                'exception' => PaymentLog::formatException($e, 2000)
+            ], Auth::id(), null, null, 'investment_process_failed');
+
+            return $this->respondBadRequest('حدث خطأ أثناء معالجة الاستثمار: ' . $e->getMessage());
         }
     }
+    /**
+     * Handle online payment for investment
+     */
+    private function handleOnlinePayment($investor, $opportunity, $data, $pay_by)
+    {
+        // Validate investment without processing payment
+        $this->investmentService->validateInvestment($investor, $opportunity, $data['shares'], $data['type']);
+
+        // Create payment intention
+        $result = $this->paymentService->createInvestmentIntention([
+            'opportunity_id' => $data['investment_opportunity_id'],
+            'shares' => $data['shares'],
+            'investment_type' => $data['type'],
+            'pay_by' => $pay_by,
+        ], Auth::id(), $pay_by);
+
+
+
+        if ($result['success']) {
+            return $this->respondCreated([
+                'success' => true,
+                'message' => 'تم إنشاء نية الدفع بنجاح',
+                'result' => $result['data'],
+                'payment_required' => true,
+            ]);
+        }
+
+        return $this->respondBadRequest($result['error'], $result['details'] ?? []);
+    }
+
+    /**
+     * Handle wallet payment for investment
+     */
+    private function handleWalletPayment($investor, $opportunity, $data)
+    {
+        $investment = $this->investmentService->invest($investor, $opportunity, $data['shares'], $data['type']);
+
+        return $this->respondCreated([
+            'success' => true,
+            'message' => 'تم شراء الأسهم بنجاح',
+            'result' => $investment,
+        ]);
+    }
+
     /**
      * Display the specified resource.
      * عرض تفاصيل الفرصة الاستثمارية
@@ -198,7 +256,7 @@ class InvestmentOpportunityController extends Controller
         }
 
         try {
-            $opportunity = InvestmentOpportunity::with(['investments' => function ($query) use ($investor) {
+            $opportunity = InvestmentOpportunity::with(['investment' => function ($query) use ($investor) {
                 $query->where('user_id', $investor->user_id);
             }])
             ->whereHas('investments', function ($query) use ($investor) {

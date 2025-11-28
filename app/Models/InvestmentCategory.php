@@ -22,5 +22,14 @@ use Illuminate\Database\Eloquent\Model;
  */
 class InvestmentCategory extends Model
 {
-    //
+    protected $fillable = [
+        'name',
+        'description',
+        'icon',
+        'is_active',
+    ];
+
+    protected $casts = [
+        'is_active' => 'boolean',
+    ];
 }

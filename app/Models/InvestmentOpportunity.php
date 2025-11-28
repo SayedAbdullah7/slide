@@ -26,6 +26,7 @@ use Spatie\MediaLibrary\InteractsWithMedia;
  * @property numeric $min_investment
  * @property numeric|null $max_investment
  * @property string|null $fund_goal
+ * @property string $allowed_investment_types
  * @property bool $show
  * @property Carbon|null $show_date
  * @property Carbon|null $offering_start_date
@@ -48,7 +49,9 @@ use Spatie\MediaLibrary\InteractsWithMedia;
  * @property-read \Spatie\MediaLibrary\MediaCollections\Models\Collections\MediaCollection<int, \Spatie\MediaLibrary\MediaCollections\Models\Media> $media
  * @property-read int|null $media_count
  * @property-read \App\Models\OwnerProfile|null $ownerProfile
+ * @property-read array $investment_type_availability_info
  * @method static \Illuminate\Database\Eloquent\Builder<static>|InvestmentOpportunity activeAndVisible()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|InvestmentOpportunity allowsInvestmentType($investmentType)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|InvestmentOpportunity newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder<static>|InvestmentOpportunity newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder<static>|InvestmentOpportunity open()
@@ -84,6 +87,12 @@ class InvestmentOpportunity extends Model implements HasMedia
 {
 //    use SoftDeletes;
     use InteractsWithMedia;
+
+    protected $attributes = [
+        'reserved_shares' => 0,
+        'allowed_investment_types' => 'both',
+    ];
+
     protected $fillable = [
         'name',
         'location',
@@ -93,42 +102,97 @@ class InvestmentOpportunity extends Model implements HasMedia
         'status',
         'risk_level',
         'target_amount',
-        'price_per_share',
+        'share_price', // سعر السهم الواحد
         'reserved_shares',
         'investment_duration',
-        'expected_return_amount_by_myself',
-        'expected_net_return_by_myself',
-        'expected_return_amount_by_authorize',
-        'expected_net_return_by_authorize',
-        'shipping_and_service_fee',
-        'min_investment',  // min investment shares for one user
-        'max_investment',  // max investment shares for one user
+        'expected_profit', // الربح المتوقع لكل سهم
+        'expected_net_profit', // صافي الربح المتوقع لكل سهم
+        'shipping_fee_per_share', // رسوم الشحن لكل سهم
+        'actual_profit_per_share', // الربح الفعلي لكل سهم
+        'actual_net_profit_per_share', // صافي الربح الفعلي لكل سهم
+        'distributed_profit', // الربح الموزع
+        'all_merchandise_delivered',
+        'all_returns_distributed',
+        'expected_delivery_date',
+        'expected_distribution_date',
+        'min_investment',  // الحد الأدنى للاستثمار (بالأسهم)
+        'max_investment',  // الحد الأقصى للاستثمار (بالأسهم)
         'fund_goal',
+        'guarantee',
         'show',
         'show_date',
         'offering_start_date',
         'offering_end_date',
         'profit_distribution_date',
+        'allowed_investment_types', // 'both', 'myself', 'authorize'
     ];
 
     protected $casts = [
         'target_amount' => 'decimal:2',
-        'price_per_share' => 'decimal:2',
-        'expected_return_amount_by_myself' => 'decimal:2',
-        'expected_net_return_by_myself' => 'decimal:2',
-        'expected_return_amount_by_authorize' => 'decimal:2',
-        'expected_net_return_by_authorize' => 'decimal:2',
-        'shipping_and_service_fee' => 'decimal:2',
+        'share_price' => 'decimal:2',
+        'expected_profit' => 'decimal:2',
+        'expected_net_profit' => 'decimal:2',
+        'shipping_fee_per_share' => 'decimal:2',
+        'actual_profit_per_share' => 'decimal:2',
+        'actual_net_profit_per_share' => 'decimal:2',
+        'distributed_profit' => 'decimal:2',
+        'all_merchandise_delivered' => 'boolean',
+        'all_returns_distributed' => 'boolean',
+        'expected_delivery_date' => 'datetime',
+        'expected_distribution_date' => 'datetime',
         'min_investment' => 'integer',
         'max_investment' => 'integer',
         'fund_goal' => 'string',
+        'guarantee' => 'string',
         'show' => 'boolean',
         'show_date' => 'datetime',
         'offering_start_date' => 'datetime',
         'offering_end_date' => 'datetime',
         'profit_distribution_date' => 'datetime',
+        'allowed_investment_types' => 'string',
     ];
 
+    /**
+     * The "booted" method of the model.
+     */
+    protected static function booted(): void
+    {
+        // Update status when opportunity is updated
+        static::updated(function (InvestmentOpportunity $opportunity) {
+            // Only update if relevant fields changed
+            if ($opportunity->wasChanged(['show', 'show_date', 'offering_start_date', 'offering_end_date', 'reserved_shares'])) {
+                $opportunity->updateDynamicStatus();
+
+                // Check and process reminders if opportunity became available
+                if ($opportunity->wasChanged(['status', 'offering_start_date']) && $opportunity->status === 'open') {
+                    $opportunity->processReminders();
+                }
+            }
+        });
+
+        // Update status when opportunity is created
+        static::created(function (InvestmentOpportunity $opportunity) {
+            $opportunity->updateDynamicStatus();
+        });
+    }
+
+    // ---------------------------------------------
+    // Mutators
+    // ---------------------------------------------
+
+    // temporary methods to keep the same API for authorize
+
+    //expected_profit_by_authorize
+    public function getExpectedProfitByAuthorizeAttribute()
+    {
+        return $this->expected_profit;
+    }
+
+    //expected_net_profit_by_authorize
+    public function getExpectedNetProfitByAuthorizeAttribute()
+    {
+        return $this->expected_net_profit;
+    }
 
 
     // ---------------------------------------------
@@ -147,7 +211,7 @@ class InvestmentOpportunity extends Model implements HasMedia
 
     public function attachments(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
-        return $this->hasMany(OpportunityAttachment::class);
+        return $this->hasMany(OpportunityAttachment::class, 'opportunity_id');
     }
 
     public function guarantees()
@@ -158,6 +222,52 @@ class InvestmentOpportunity extends Model implements HasMedia
     public function investments()
     {
         return $this->hasMany(Investment::class, 'opportunity_id');
+    }
+
+    public function investmentsMyself()
+    {
+        return $this->hasMany(Investment::class, 'opportunity_id')->myself();
+    }
+
+    public function investmentsAuthorize()
+    {
+        return $this->hasMany(Investment::class, 'opportunity_id')->authorize();
+    }
+
+    public function investmentsNotDistributedAuthorize()
+    {
+        return $this->investments()->notDistributedAuthorize();
+    }
+
+    public function investmentsNotArrivedMyself()
+    {
+        return $this->investments()->notArrivedMyself();
+    }
+
+    //counts
+    public function countInvestmentsNotDistributedAuthorize()
+    {
+        return $this->investmentsNotDistributedAuthorize()->count();
+    }
+
+    public function countInvestmentsNotArrivedMyself()
+    {
+        return $this->investmentsNotArrivedMyself()->count();
+    }
+
+    public function investment()
+    {
+        return $this->hasOne(Investment::class, 'opportunity_id');
+    }
+
+    public function reminders()
+    {
+        return $this->hasMany(InvestmentOpportunityReminder::class);
+    }
+
+    public function savedOpportunities()
+    {
+        return $this->hasMany(SavedInvestmentOpportunity::class);
     }
 
 
@@ -203,9 +313,15 @@ class InvestmentOpportunity extends Model implements HasMedia
      */
     public function scopeComing($query)
     {
-        return $query->where('status', 'open')
-            ->where('show', true)
-            ->where('offering_start_date', '>', now());
+//        return $query->where('status', 'open')
+//            ->where('show', true)
+//            ->where('offering_start_date', '>', now());
+        return $query->where('show', true)
+            ->where(function ($q) {
+                $now = now();
+                $q->whereNotNull('offering_start_date')
+                    ->where('offering_start_date', '>', $now);
+            });
     }
 
     /**
@@ -272,6 +388,18 @@ class InvestmentOpportunity extends Model implements HasMedia
         return $query;
     }
 
+    /**
+     * Filter opportunities by allowed investment type
+     * نطاق الفرص حسب نوع الاستثمار المسموح
+     */
+    public function scopeAllowsInvestmentType($query, $investmentType)
+    {
+        return $query->where(function ($q) use ($investmentType) {
+            $q->where('allowed_investment_types', 'both')
+                ->orWhere('allowed_investment_types', $investmentType);
+        });
+    }
+
 
     // ---------------------------------------------
     // Accessors
@@ -279,8 +407,8 @@ class InvestmentOpportunity extends Model implements HasMedia
 
     public function getTotalSharesAttribute(): int
     {
-        return $this->price_per_share > 0
-            ? (int) floor($this->target_amount / $this->price_per_share)
+        return $this->share_price > 0
+            ? (int) floor($this->target_amount / $this->share_price)
             : 0;
     }
 
@@ -335,6 +463,14 @@ class InvestmentOpportunity extends Model implements HasMedia
                 && $this->isWithinOfferingWindow();
     }
 
+    public function isComing(): bool
+    {
+        $now = now();
+        return $this->show &&
+               $this->offering_start_date &&
+               $this->offering_start_date > $now;
+    }
+
     public function registerMediaCollections(): void
     {
         $this
@@ -350,6 +486,11 @@ class InvestmentOpportunity extends Model implements HasMedia
         $this
             ->addMediaCollection('cover')
             ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp']);
+
+            $this
+            ->addMediaCollection('owner_avatar')
+            ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp'])
+            ->singleFile();
     }
 
     // ---------------------------------------------
@@ -357,83 +498,51 @@ class InvestmentOpportunity extends Model implements HasMedia
     // ---------------------------------------------
 
     /**
-     * Calculate expected return amount percentage per share for myself (direct investment)
+     * Calculate expected profit percentage per share
      */
-    public function expectedReturnAmountByMyselfPercentage(): float
+    public function expectedProfitPercentage(): float
     {
         if (
-            !$this->expected_return_amount_by_myself ||
-            !$this->price_per_share ||
-            $this->price_per_share <= 0
+            !$this->expected_profit ||
+            !$this->share_price ||
+            $this->share_price <= 0
         ) {
             return 0;
         }
 
-        return round(($this->expected_return_amount_by_myself / $this->price_per_share) * 100, 2);
+        return round(($this->expected_profit / $this->share_price) * 100, 2);
     }
 
     /**
-     * Calculate expected net return percentage per share for myself (direct investment)
+     * Calculate expected net profit percentage per share
      */
-    public function expectedNetReturnByMyselfPercentage(): float
+    public function expectedNetProfitPercentage(): float
     {
         if (
-            !$this->expected_net_return_by_myself ||
-            !$this->price_per_share ||
-            $this->price_per_share <= 0
+            !$this->expected_net_profit ||
+            !$this->share_price ||
+            $this->share_price <= 0
         ) {
             return 0;
         }
 
-        return round(($this->expected_net_return_by_myself / $this->price_per_share) * 100, 2);
+        return round(($this->expected_net_profit / $this->share_price) * 100, 2);
     }
 
     /**
-     * Calculate expected return amount percentage per share for authorized investments
+     * Calculate shipping fee percentage per share
      */
-    public function expectedReturnAmountByAuthorizePercentage(): float
+    public function shippingFeePercentage(): float
     {
         if (
-            !$this->expected_return_amount_by_authorize ||
-            !$this->price_per_share ||
-            $this->price_per_share <= 0
+            !$this->shipping_fee_per_share ||
+            !$this->share_price ||
+            $this->share_price <= 0
         ) {
             return 0;
         }
 
-        return round(($this->expected_return_amount_by_authorize / $this->price_per_share) * 100, 2);
-    }
-
-    /**
-     * Calculate expected net return percentage per share for authorized investments
-     */
-    public function expectedNetReturnByAuthorizePercentage(): float
-    {
-        if (
-            !$this->expected_net_return_by_authorize ||
-            !$this->price_per_share ||
-            $this->price_per_share <= 0
-        ) {
-            return 0;
-        }
-
-        return round(($this->expected_net_return_by_authorize / $this->price_per_share) * 100, 2);
-    }
-
-    /**
-     * Calculate shipping and service fee percentage per share
-     */
-    public function shippingDeliveryCostPercentage(): float
-    {
-        if (
-            !$this->shipping_and_service_fee ||
-            !$this->price_per_share ||
-            $this->price_per_share <= 0
-        ) {
-            return 0;
-        }
-
-        return round(($this->shipping_and_service_fee / $this->price_per_share) * 100, 2);
+        return round(($this->shipping_fee_per_share / $this->share_price) * 100, 2);
     }
 
     // ---------------------------------------------
@@ -484,5 +593,237 @@ class InvestmentOpportunity extends Model implements HasMedia
         return round(($this->total_guarantee_value / $this->target_amount) * 100, 2);
     }
 
+    // ---------------------------------------------
+    // Dynamic Status Methods
+    // ---------------------------------------------
+
+    /**
+     * Calculate dynamic status based on dates and conditions
+     */
+    public function calculateDynamicStatus(): string
+    {
+        $now = now();
+
+        // If manually set to completed or suspended, keep it
+        if (in_array($this->status, ['completed', 'suspended'])) {
+            return $this->status;
+        }
+
+        // If not shown yet
+        if (!$this->show || !$this->show_date || $this->show_date > $now) {
+            return 'draft';
+        }
+
+        // If offering hasn't started yet
+        if ($this->offering_start_date && $this->offering_start_date > $now) {
+            return 'coming';
+        }
+
+        // If offering has ended
+        if ($this->offering_end_date && $this->offering_end_date < $now) {
+            // Check if fully funded
+            if ($this->completion_rate >= 100) {
+                return 'completed';
+            } else {
+                return 'expired';
+            }
+        }
+
+        // If within offering period
+        if ($this->isWithinOfferingWindow()) {
+            // Check if fully funded
+            if ($this->completion_rate >= 100) {
+                return 'completed';
+            } else {
+                return 'open';
+            }
+        }
+
+        // Default to pending if no clear status
+        return 'pending';
+    }
+
+    /**
+     * Update status dynamically
+     */
+    public function updateDynamicStatus(): bool
+    {
+        $newStatus = $this->calculateDynamicStatus();
+
+        if ($this->status !== $newStatus) {
+            $this->status = $newStatus;
+            return $this->save();
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if status should be updated
+     */
+    public function shouldUpdateStatus(): bool
+    {
+        $currentStatus = $this->status;
+        $calculatedStatus = $this->calculateDynamicStatus();
+
+        return $currentStatus !== $calculatedStatus;
+    }
+
+    /**
+     * Get status with label and color
+     */
+    public function getStatusInfoAttribute(): array
+    {
+        return [
+            'value' => $this->status,
+            'text' => \App\InvestmentStatusEnum::label($this->status),
+            'color' => \App\InvestmentStatusEnum::color($this->status),
+        ];
+    }
+
+    /**
+     * Process reminders for this opportunity when it becomes available
+     */
+    public function processReminders(): void
+    {
+        try {
+            $reminderService = app(\App\Services\InvestmentOpportunityReminderService::class);
+
+            // Get all active, unsent reminders for this opportunity
+            $reminders = $this->reminders()
+                ->active()
+                ->unsent()
+                ->with(['investorProfile.user'])
+                ->get();
+
+            foreach ($reminders as $reminder) {
+                try {
+                    // Send the reminder notification
+                    $this->sendReminderNotification($reminder);
+
+                    // Mark as sent
+                    $reminder->markAsSent();
+
+                    \Log::info('Reminder sent for opportunity', [
+                        'opportunity_id' => $this->id,
+                        'opportunity_name' => $this->name,
+                        'reminder_id' => $reminder->id,
+                        'investor_id' => $reminder->investor_profile_id,
+                    ]);
+                } catch (\Exception $e) {
+                    \Log::error('Failed to send reminder for opportunity', [
+                        'opportunity_id' => $this->id,
+                        'reminder_id' => $reminder->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+        } catch (\Exception $e) {
+            \Log::error('Failed to process reminders for opportunity', [
+                'opportunity_id' => $this->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Send reminder notification for a specific reminder
+     */
+    protected function sendReminderNotification(\App\Models\InvestmentOpportunityReminder $reminder): void
+    {
+        $investor = $reminder->investorProfile;
+        $user = $investor->user;
+
+        // Log the reminder notification
+        \Log::info('Sending reminder notification', [
+            'user_id' => $user->id,
+            'user_phone' => $user->phone,
+            'user_email' => $user->email,
+            'opportunity_id' => $this->id,
+            'opportunity_name' => $this->name,
+            'opportunity_start_date' => $this->offering_start_date,
+        ]);
+
+        // TODO: Implement actual notification sending (SMS, Email, Push, etc.)
+        // Examples:
+        // - Send SMS notification
+        // - Send email notification
+        // - Send push notification
+        // - Add to notification queue
+
+        // For now, we'll just dispatch an event that can be listened to
+        event(new \App\Events\InvestmentOpportunityAvailable($this, $reminder));
+    }
+
+    /**
+     * Check if actual profits can be edited
+     * Actual profits can only be edited if they haven't been set yet (are null)
+     */
+    public function canEditActualProfits(): bool
+    {
+        return $this->actual_profit_per_share === null && $this->actual_net_profit_per_share === null;
+    }
+
+    // ---------------------------------------------
+    // Investment Type Availability Methods
+    // ---------------------------------------------
+
+    /**
+     * Check if a specific investment type is allowed
+     * التحقق من السماح بنوع استثمار محدد
+     */
+    public function allowsInvestmentType(string $investmentType): bool
+    {
+        if ($this->allowed_investment_types === 'both') {
+            return true;
+        }
+
+        return $this->allowed_investment_types === $investmentType;
+    }
+
+    /**
+     * Check if 'myself' investment type is allowed
+     * التحقق من السماح بنوع الاستثمار 'myself'
+     */
+    public function allowsMyself(): bool
+    {
+        return $this->allowsInvestmentType('myself');
+    }
+
+    /**
+     * Check if 'authorize' investment type is allowed
+     * التحقق من السماح بنوع الاستثمار 'authorize'
+     */
+    public function allowsAuthorize(): bool
+    {
+        return $this->allowsInvestmentType('authorize');
+    }
+
+    /**
+     * Get allowed investment types as an array
+     * الحصول على أنواع الاستثمار المسموحة كمصفوفة
+     */
+    public function getAllowedInvestmentTypesArray(): array
+    {
+        if ($this->allowed_investment_types === 'both' || $this->allowed_investment_types === null) {
+            return ['myself', 'authorize'];
+        }
+
+        return [$this->allowed_investment_types];
+    }
+
+    /**
+     * Get investment type availability info
+     * الحصول على معلومات توفر أنواع الاستثمار
+     */
+    public function getInvestmentTypeAvailabilityInfoAttribute(): array
+    {
+        return [
+            'value' => $this->allowed_investment_types,
+            'allows_myself' => $this->allowsMyself(),
+            'allows_authorize' => $this->allowsAuthorize(),
+            'allowed_types' => $this->getAllowedInvestmentTypesArray(),
+        ];
+    }
 
 }

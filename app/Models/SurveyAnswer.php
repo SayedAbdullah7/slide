@@ -37,14 +37,14 @@ class SurveyAnswer extends Model
     protected $fillable = ['user_id','survey_question_id','survey_option_id','answer_text'];
 
     public function question() {
-        return $this->belongsTo(SurveyQuestion::class);
+        return $this->belongsTo(SurveyQuestion::class, 'survey_question_id');
     }
 
     public function option() {
-        return $this->belongsTo(SurveyOption::class);
+        return $this->belongsTo(SurveyOption::class, 'survey_option_id');
     }
 
     public function user() {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class, 'user_id');
     }
 }

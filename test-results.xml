@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="/home/sayed/Downloads/slide/phpunit.xml" tests="1" assertions="0" errors="1" failures="0" skipped="0" time="3.237478">
+    <testsuite name="Feature" tests="1" assertions="0" errors="1" failures="0" skipped="0" time="3.237478">
+      <testsuite name="Tests\Feature\PaymentWebhookTest" file="/home/sayed/Downloads/slide/tests/Feature/PaymentWebhookTest.php" tests="1" assertions="0" errors="1" failures="0" skipped="0" time="3.237478">
+        <testcase name="it_processes_successful_investment_webhook" file="/home/sayed/Downloads/slide/tests/Feature/PaymentWebhookTest.php" line="113" class="Tests\Feature\PaymentWebhookTest" classname="Tests.Feature.PaymentWebhookTest" assertions="0" time="3.237478">
+          <error type="Illuminate\Database\QueryException">Tests\Feature\PaymentWebhookTest::it_processes_successful_investment_webhook
+Illuminate\Database\QueryException: SQLSTATE[23000]: Integrity constraint violation: 1452 Cannot add or update a child row: a foreign key constraint fails (`slide_test`.`investment_opportunities`, CONSTRAINT `investment_opportunities_category_id_foreign` FOREIGN KEY (`category_id`) REFERENCES `investment_categories` (`id`) ON DELETE SET NULL) (Connection: mysql, SQL: insert into `investment_opportunities` (`reserved_shares`, `owner_profile_id`, `name`, `description`, `share_price`, `target_amount`, `status`, `category_id`, `updated_at`, `created_at`) values (0, 1, Test Opportunity, Test Description, 100, 10000, active, 1, 2025-10-17 11:34:08, 2025-10-17 11:34:08))
+
+/home/sayed/Downloads/slide/vendor/laravel/framework/src/Illuminate/Database/Connection.php:824
+/home/sayed/Downloads/slide/vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+/home/sayed/Downloads/slide/vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+/home/sayed/Downloads/slide/vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+/home/sayed/Downloads/slide/vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+/home/sayed/Downloads/slide/vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+/home/sayed/Downloads/slide/vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+/home/sayed/Downloads/slide/vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+/home/sayed/Downloads/slide/vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+/home/sayed/Downloads/slide/vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:1219
+/home/sayed/Downloads/slide/vendor/laravel/framework/src/Illuminate/Support/helpers.php:390
+/home/sayed/Downloads/slide/vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:1218
+/home/sayed/Downloads/slide/vendor/laravel/framework/src/Illuminate/Support/Traits/ForwardsCalls.php:23
+/home/sayed/Downloads/slide/vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:2540
+/home/sayed/Downloads/slide/vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:2556
+/home/sayed/Downloads/slide/tests/Feature/PaymentWebhookTest.php:129</error>
+        </testcase>
+      </testsuite>
+    </testsuite>
+  </testsuite>
+</testsuites>

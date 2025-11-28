@@ -15,7 +15,7 @@
         <!--begin::Mobile logo-->
         <div class="d-flex align-items-center flex-grow-1 flex-lg-grow-0">
             <a href="../../demo1/dist/index.html" class="d-lg-none">
-                <img alt="Logo" src="assets/media/logos/default-small.svg" class="h-30px" />
+                <img alt="Logo" src="{{ asset('assets/media/logos/default-small.svg') }}" class="h-30px" />
             </a>
         </div>
         <!--end::Mobile logo-->
@@ -687,7 +687,7 @@
                                             <!--end:Col-->
                                             <!--begin:Col-->
                                             <div class="col-lg-4">
-                                                <img src="assets/media/stock/600x600/img-82.jpg" class="rounded mw-100" alt="" />
+                                                <img src="{{ asset('assets/media/stock/600x600/img-82.jpg') }}" class="rounded mw-100" alt="" />
                                             </div>
                                             <!--end:Col-->
                                         </div>
@@ -797,7 +797,7 @@
                                             <!--end:Col-->
                                             <!--begin:Col-->
                                             <div class="col-lg-7">
-                                                <img src="assets/media/stock/900x600/46.jpg" class="rounded mw-100" alt="" />
+                                                <img src="{{ asset('assets/media/stock/900x600/46.jpg') }}" class="rounded mw-100" alt="" />
                                             </div>
                                             <!--end:Col-->
                                         </div>
@@ -1509,7 +1509,7 @@
                                             <!--end:Col-->
                                             <!--begin:Col-->
                                             <div class="col-lg-5 pe-lg-5">
-                                                <img src="assets/media/stock/600x600/img-84.jpg" class="rounded mw-100" alt="" />
+                                                <img src="{{ asset('assets/media/stock/600x600/img-84.jpg') }}" class="rounded mw-100" alt="" />
                                             </div>
                                             <!--end:Col-->
                                         </div>
@@ -1580,7 +1580,7 @@
                                             <!--end:Col-->
                                             <!--begin:Col-->
                                             <div class="col-lg-8">
-                                                <img src="assets/media/stock/900x600/44.jpg" class="rounded mw-100" alt="" />
+                                                <img src="{{ asset('assets/media/stock/900x600/44.jpg') }}" class="rounded mw-100" alt="" />
                                             </div>
                                             <!--end:Col-->
                                         </div>
@@ -2995,7 +2995,7 @@
                                     <!--end:Col-->
                                     <!--begin:Col-->
                                     <div class="col-lg-5 mb-3 py-lg-3 pe-lg-8 d-flex align-items-center">
-                                        <img src="assets/media/stock/900x600/45.jpg" class="rounded mw-100" alt="" />
+                                        <img src="{{ asset('assets/media/stock/900x600/45.jpg') }}" class="rounded mw-100" alt="" />
                                     </div>
                                     <!--end:Col-->
                                 </div>
@@ -3148,7 +3148,7 @@
                                         <a href="#" class="d-flex text-dark text-hover-primary align-items-center mb-5">
                                             <!--begin::Symbol-->
                                             <div class="symbol symbol-40px me-4">
-                                                <img src="assets/media/avatars/300-6.jpg" alt="" />
+                                                <img src="{{ asset('assets/media/avatars/300-6.jpg') }}" alt="" />
                                             </div>
                                             <!--end::Symbol-->
                                             <!--begin::Title-->
@@ -3163,7 +3163,7 @@
                                         <a href="#" class="d-flex text-dark text-hover-primary align-items-center mb-5">
                                             <!--begin::Symbol-->
                                             <div class="symbol symbol-40px me-4">
-                                                <img src="assets/media/avatars/300-2.jpg" alt="" />
+                                                <img src="{{ asset('assets/media/avatars/300-2.jpg') }}" alt="" />
                                             </div>
                                             <!--end::Symbol-->
                                             <!--begin::Title-->
@@ -3178,7 +3178,7 @@
                                         <a href="#" class="d-flex text-dark text-hover-primary align-items-center mb-5">
                                             <!--begin::Symbol-->
                                             <div class="symbol symbol-40px me-4">
-                                                <img src="assets/media/avatars/300-9.jpg" alt="" />
+                                                <img src="{{ asset('assets/media/avatars/300-9.jpg') }}" alt="" />
                                             </div>
                                             <!--end::Symbol-->
                                             <!--begin::Title-->
@@ -3193,7 +3193,7 @@
                                         <a href="#" class="d-flex text-dark text-hover-primary align-items-center mb-5">
                                             <!--begin::Symbol-->
                                             <div class="symbol symbol-40px me-4">
-                                                <img src="assets/media/avatars/300-14.jpg" alt="" />
+                                                <img src="{{ asset('assets/media/avatars/300-14.jpg') }}" alt="" />
                                             </div>
                                             <!--end::Symbol-->
                                             <!--begin::Title-->
@@ -3208,7 +3208,7 @@
                                         <a href="#" class="d-flex text-dark text-hover-primary align-items-center mb-5">
                                             <!--begin::Symbol-->
                                             <div class="symbol symbol-40px me-4">
-                                                <img src="assets/media/avatars/300-11.jpg" alt="" />
+                                                <img src="{{ asset('assets/media/avatars/300-11.jpg') }}" alt="" />
                                             </div>
                                             <!--end::Symbol-->
                                             <!--begin::Title-->
@@ -3227,7 +3227,7 @@
                                             <!--begin::Symbol-->
                                             <div class="symbol symbol-40px me-4">
 																<span class="symbol-label bg-light">
-																	<img class="w-20px h-20px" src="assets/media/svg/brand-logos/volicity-9.svg" alt="" />
+																	<img class="w-20px h-20px" src="{{ asset('assets/media/svg/brand-logos/volicity-9.svg') }}" alt="" />
 																</span>
                                             </div>
                                             <!--end::Symbol-->
@@ -3244,7 +3244,7 @@
                                             <!--begin::Symbol-->
                                             <div class="symbol symbol-40px me-4">
 																<span class="symbol-label bg-light">
-																	<img class="w-20px h-20px" src="assets/media/svg/brand-logos/tvit.svg" alt="" />
+																	<img class="w-20px h-20px" src="{{ asset('assets/media/svg/brand-logos/tvit.svg') }}" alt="" />
 																</span>
                                             </div>
                                             <!--end::Symbol-->
@@ -3261,7 +3261,7 @@
                                             <!--begin::Symbol-->
                                             <div class="symbol symbol-40px me-4">
 																<span class="symbol-label bg-light">
-																	<img class="w-20px h-20px" src="assets/media/svg/misc/infography.svg" alt="" />
+																	<img class="w-20px h-20px" src="{{ asset('assets/media/svg/misc/infography.svg') }}" alt="" />
 																</span>
                                             </div>
                                             <!--end::Symbol-->
@@ -3278,7 +3278,7 @@
                                             <!--begin::Symbol-->
                                             <div class="symbol symbol-40px me-4">
 																<span class="symbol-label bg-light">
-																	<img class="w-20px h-20px" src="assets/media/svg/brand-logos/leaf.svg" alt="" />
+																	<img class="w-20px h-20px" src="{{ asset('assets/media/svg/brand-logos/leaf.svg') }}" alt="" />
 																</span>
                                             </div>
                                             <!--end::Symbol-->
@@ -3295,7 +3295,7 @@
                                             <!--begin::Symbol-->
                                             <div class="symbol symbol-40px me-4">
 																<span class="symbol-label bg-light">
-																	<img class="w-20px h-20px" src="assets/media/svg/brand-logos/tower.svg" alt="" />
+																	<img class="w-20px h-20px" src="{{ asset('assets/media/svg/brand-logos/tower.svg') }}" alt="" />
 																</span>
                                             </div>
                                             <!--end::Symbol-->
@@ -3776,7 +3776,7 @@
                     <!--begin::Menu-->
                     <div class="menu menu-sub menu-sub-dropdown menu-column w-350px w-lg-375px" data-kt-menu="true" id="kt_menu_notifications">
                         <!--begin::Heading-->
-                        <div class="d-flex flex-column bgi-no-repeat rounded-top" style="background-image:url('assets/media/misc/menu-header-bg.jpg')">
+                        <div class="d-flex flex-column bgi-no-repeat rounded-top" style="background-image:url('{{ asset('assets/media/misc/menu-header-bg.jpg') }}')">
                             <!--begin::Title-->
                             <h3 class="text-white fw-semibold px-9 mt-10 mb-6">Notifications
                                 <span class="fs-8 opacity-75 ps-3">24 reports</span></h3>
@@ -4044,7 +4044,7 @@
                                     <!--end::Section-->
                                     <!--begin::Illustration-->
                                     <div class="text-center px-4">
-                                        <img class="mw-100 mh-200px" alt="image" src="assets/media/illustrations/sketchy-1/1.png" />
+                                        <img class="mw-100 mh-200px" alt="image" src="{{ asset('assets/media/illustrations/sketchy-1/1.png') }}" />
                                     </div>
                                     <!--end::Illustration-->
                                 </div>
@@ -4421,7 +4421,7 @@
                                         <!--begin::Col-->
                                         <div class="col-4">
                                             <a href="#" class="d-flex flex-column flex-center text-center text-gray-800 text-hover-primary bg-hover-light rounded py-4 px-3 mb-3">
-                                                <img src="assets/media/svg/brand-logos/amazon.svg" class="w-25px h-25px mb-2" alt="" />
+                                                <img src="{{ asset('assets/media/svg/brand-logos/amazon.svg') }}" class="w-25px h-25px mb-2" alt="" />
                                                 <span class="fw-semibold">AWS</span>
                                             </a>
                                         </div>
@@ -4429,7 +4429,7 @@
                                         <!--begin::Col-->
                                         <div class="col-4">
                                             <a href="#" class="d-flex flex-column flex-center text-center text-gray-800 text-hover-primary bg-hover-light rounded py-4 px-3 mb-3">
-                                                <img src="assets/media/svg/brand-logos/angular-icon-1.svg" class="w-25px h-25px mb-2" alt="" />
+                                                <img src="{{ asset('assets/media/svg/brand-logos/angular-icon-1.svg') }}" class="w-25px h-25px mb-2" alt="" />
                                                 <span class="fw-semibold">AngularJS</span>
                                             </a>
                                         </div>
@@ -4437,7 +4437,7 @@
                                         <!--begin::Col-->
                                         <div class="col-4">
                                             <a href="#" class="d-flex flex-column flex-center text-center text-gray-800 text-hover-primary bg-hover-light rounded py-4 px-3 mb-3">
-                                                <img src="assets/media/svg/brand-logos/atica.svg" class="w-25px h-25px mb-2" alt="" />
+                                                <img src="{{ asset('assets/media/svg/brand-logos/atica.svg') }}" class="w-25px h-25px mb-2" alt="" />
                                                 <span class="fw-semibold">Atica</span>
                                             </a>
                                         </div>
@@ -4445,7 +4445,7 @@
                                         <!--begin::Col-->
                                         <div class="col-4">
                                             <a href="#" class="d-flex flex-column flex-center text-center text-gray-800 text-hover-primary bg-hover-light rounded py-4 px-3 mb-3">
-                                                <img src="assets/media/svg/brand-logos/beats-electronics.svg" class="w-25px h-25px mb-2" alt="" />
+                                                <img src="{{ asset('assets/media/svg/brand-logos/beats-electronics.svg') }}" class="w-25px h-25px mb-2" alt="" />
                                                 <span class="fw-semibold">Music</span>
                                             </a>
                                         </div>
@@ -4453,7 +4453,7 @@
                                         <!--begin::Col-->
                                         <div class="col-4">
                                             <a href="#" class="d-flex flex-column flex-center text-center text-gray-800 text-hover-primary bg-hover-light rounded py-4 px-3 mb-3">
-                                                <img src="assets/media/svg/brand-logos/codeigniter.svg" class="w-25px h-25px mb-2" alt="" />
+                                                <img src="{{ asset('assets/media/svg/brand-logos/codeigniter.svg') }}" class="w-25px h-25px mb-2" alt="" />
                                                 <span class="fw-semibold">Codeigniter</span>
                                             </a>
                                         </div>
@@ -4461,7 +4461,7 @@
                                         <!--begin::Col-->
                                         <div class="col-4">
                                             <a href="#" class="d-flex flex-column flex-center text-center text-gray-800 text-hover-primary bg-hover-light rounded py-4 px-3 mb-3">
-                                                <img src="assets/media/svg/brand-logos/bootstrap-4.svg" class="w-25px h-25px mb-2" alt="" />
+                                                <img src="{{ asset('assets/media/svg/brand-logos/bootstrap-4.svg') }}" class="w-25px h-25px mb-2" alt="" />
                                                 <span class="fw-semibold">Bootstrap</span>
                                             </a>
                                         </div>
@@ -4469,7 +4469,7 @@
                                         <!--begin::Col-->
                                         <div class="col-4">
                                             <a href="#" class="d-flex flex-column flex-center text-center text-gray-800 text-hover-primary bg-hover-light rounded py-4 px-3 mb-3">
-                                                <img src="assets/media/svg/brand-logos/google-tag-manager.svg" class="w-25px h-25px mb-2" alt="" />
+                                                <img src="{{ asset('assets/media/svg/brand-logos/google-tag-manager.svg') }}" class="w-25px h-25px mb-2" alt="" />
                                                 <span class="fw-semibold">GTM</span>
                                             </a>
                                         </div>
@@ -4477,7 +4477,7 @@
                                         <!--begin::Col-->
                                         <div class="col-4">
                                             <a href="#" class="d-flex flex-column flex-center text-center text-gray-800 text-hover-primary bg-hover-light rounded py-4 px-3 mb-3">
-                                                <img src="assets/media/svg/brand-logos/disqus.svg" class="w-25px h-25px mb-2" alt="" />
+                                                <img src="{{ asset('assets/media/svg/brand-logos/disqus.svg') }}" class="w-25px h-25px mb-2" alt="" />
                                                 <span class="fw-semibold">Disqus</span>
                                             </a>
                                         </div>
@@ -4485,7 +4485,7 @@
                                         <!--begin::Col-->
                                         <div class="col-4">
                                             <a href="#" class="d-flex flex-column flex-center text-center text-gray-800 text-hover-primary bg-hover-light rounded py-4 px-3 mb-3">
-                                                <img src="assets/media/svg/brand-logos/dribbble-icon-1.svg" class="w-25px h-25px mb-2" alt="" />
+                                                <img src="{{ asset('assets/media/svg/brand-logos/dribbble-icon-1.svg') }}" class="w-25px h-25px mb-2" alt="" />
                                                 <span class="fw-semibold">Dribble</span>
                                             </a>
                                         </div>
@@ -4493,7 +4493,7 @@
                                         <!--begin::Col-->
                                         <div class="col-4">
                                             <a href="#" class="d-flex flex-column flex-center text-center text-gray-800 text-hover-primary bg-hover-light rounded py-4 px-3 mb-3">
-                                                <img src="assets/media/svg/brand-logos/google-play-store.svg" class="w-25px h-25px mb-2" alt="" />
+                                                <img src="{{ asset('assets/media/svg/brand-logos/google-play-store.svg') }}" class="w-25px h-25px mb-2" alt="" />
                                                 <span class="fw-semibold">Play Store</span>
                                             </a>
                                         </div>
@@ -4501,7 +4501,7 @@
                                         <!--begin::Col-->
                                         <div class="col-4">
                                             <a href="#" class="d-flex flex-column flex-center text-center text-gray-800 text-hover-primary bg-hover-light rounded py-4 px-3 mb-3">
-                                                <img src="assets/media/svg/brand-logos/google-podcasts.svg" class="w-25px h-25px mb-2" alt="" />
+                                                <img src="{{ asset('assets/media/svg/brand-logos/google-podcasts.svg') }}" class="w-25px h-25px mb-2" alt="" />
                                                 <span class="fw-semibold">Podcasts</span>
                                             </a>
                                         </div>
@@ -4509,7 +4509,7 @@
                                         <!--begin::Col-->
                                         <div class="col-4">
                                             <a href="#" class="d-flex flex-column flex-center text-center text-gray-800 text-hover-primary bg-hover-light rounded py-4 px-3 mb-3">
-                                                <img src="assets/media/svg/brand-logos/figma-1.svg" class="w-25px h-25px mb-2" alt="" />
+                                                <img src="{{ asset('assets/media/svg/brand-logos/figma-1.svg') }}" class="w-25px h-25px mb-2" alt="" />
                                                 <span class="fw-semibold">Figma</span>
                                             </a>
                                         </div>
@@ -4517,7 +4517,7 @@
                                         <!--begin::Col-->
                                         <div class="col-4">
                                             <a href="#" class="d-flex flex-column flex-center text-center text-gray-800 text-hover-primary bg-hover-light rounded py-4 px-3 mb-3">
-                                                <img src="assets/media/svg/brand-logos/github.svg" class="w-25px h-25px mb-2" alt="" />
+                                                <img src="{{ asset('assets/media/svg/brand-logos/github.svg') }}" class="w-25px h-25px mb-2" alt="" />
                                                 <span class="fw-semibold">Github</span>
                                             </a>
                                         </div>
@@ -4525,7 +4525,7 @@
                                         <!--begin::Col-->
                                         <div class="col-4">
                                             <a href="#" class="d-flex flex-column flex-center text-center text-gray-800 text-hover-primary bg-hover-light rounded py-4 px-3 mb-3">
-                                                <img src="assets/media/svg/brand-logos/gitlab.svg" class="w-25px h-25px mb-2" alt="" />
+                                                <img src="{{ asset('assets/media/svg/brand-logos/gitlab.svg') }}" class="w-25px h-25px mb-2" alt="" />
                                                 <span class="fw-semibold">Gitlab</span>
                                             </a>
                                         </div>
@@ -4533,7 +4533,7 @@
                                         <!--begin::Col-->
                                         <div class="col-4">
                                             <a href="#" class="d-flex flex-column flex-center text-center text-gray-800 text-hover-primary bg-hover-light rounded py-4 px-3 mb-3">
-                                                <img src="assets/media/svg/brand-logos/instagram-2-1.svg" class="w-25px h-25px mb-2" alt="" />
+                                                <img src="{{ asset('assets/media/svg/brand-logos/instagram-2-1.svg') }}" class="w-25px h-25px mb-2" alt="" />
                                                 <span class="fw-semibold">Instagram</span>
                                             </a>
                                         </div>
@@ -4541,7 +4541,7 @@
                                         <!--begin::Col-->
                                         <div class="col-4">
                                             <a href="#" class="d-flex flex-column flex-center text-center text-gray-800 text-hover-primary bg-hover-light rounded py-4 px-3 mb-3">
-                                                <img src="assets/media/svg/brand-logos/pinterest-p.svg" class="w-25px h-25px mb-2" alt="" />
+                                                <img src="{{ asset('assets/media/svg/brand-logos/pinterest-p.svg') }}" class="w-25px h-25px mb-2" alt="" />
                                                 <span class="fw-semibold">Pinterest</span>
                                             </a>
                                         </div>
@@ -4563,7 +4563,7 @@
                 <div class="app-navbar-item ms-1 ms-md-4" id="kt_header_user_menu_toggle">
                     <!--begin::Menu wrapper-->
                     <div class="cursor-pointer symbol symbol-35px" data-kt-menu-trigger="{default: 'click', lg: 'hover'}" data-kt-menu-attach="parent" data-kt-menu-placement="bottom-end">
-                        <img src="assets/media/avatars/300-3.jpg" class="rounded-3" alt="user" />
+                        <img src="{{ asset('assets/media/avatars/300-3.jpg') }}" class="rounded-3" alt="user" />
                     </div>
                     <!--begin::User account menu-->
                     <div class="menu menu-sub menu-sub-dropdown menu-column menu-rounded menu-gray-800 menu-state-bg menu-state-color fw-semibold py-4 fs-6 w-275px" data-kt-menu="true">
@@ -4572,7 +4572,7 @@
                             <div class="menu-content d-flex align-items-center px-3">
                                 <!--begin::Avatar-->
                                 <div class="symbol symbol-50px me-5">
-                                    <img alt="Logo" src="assets/media/avatars/300-3.jpg" />
+                                        <img alt="Logo" src="{{ asset('assets/media/avatars/300-3.jpg') }}" />
                                 </div>
                                 <!--end::Avatar-->
                                 <!--begin::Username-->
@@ -4746,7 +4746,7 @@
                             <a href="#" class="menu-link px-5">
 												<span class="menu-title position-relative">Language
 												<span class="fs-8 rounded bg-light px-3 py-2 position-absolute translate-middle-y top-50 end-0">English
-												<img class="w-15px h-15px rounded-1 ms-2" src="assets/media/flags/united-states.svg" alt="" /></span></span>
+												<img class="w-15px h-15px rounded-1 ms-2" src="{{ asset('assets/media/flags/united-states.svg') }}" alt="" /></span></span>
                             </a>
                             <!--begin::Menu sub-->
                             <div class="menu-sub menu-sub-dropdown w-175px py-4">
@@ -4754,7 +4754,7 @@
                                 <div class="menu-item px-3">
                                     <a href="../../demo1/dist/account/settings.html" class="menu-link d-flex px-5 active">
 													<span class="symbol symbol-20px me-4">
-														<img class="rounded-1" src="assets/media/flags/united-states.svg" alt="" />
+														<img class="rounded-1" src="{{ asset('assets/media/flags/united-states.svg') }}" alt="" />
 													</span>English</a>
                                 </div>
                                 <!--end::Menu item-->
@@ -4762,7 +4762,7 @@
                                 <div class="menu-item px-3">
                                     <a href="../../demo1/dist/account/settings.html" class="menu-link d-flex px-5">
 													<span class="symbol symbol-20px me-4">
-														<img class="rounded-1" src="assets/media/flags/spain.svg" alt="" />
+														<img class="rounded-1" src="{{ asset('assets/media/flags/spain.svg') }}" alt="" />
 													</span>Spanish</a>
                                 </div>
                                 <!--end::Menu item-->
@@ -4770,7 +4770,7 @@
                                 <div class="menu-item px-3">
                                     <a href="../../demo1/dist/account/settings.html" class="menu-link d-flex px-5">
 													<span class="symbol symbol-20px me-4">
-														<img class="rounded-1" src="assets/media/flags/germany.svg" alt="" />
+														<img class="rounded-1" src="{{ asset('assets/media/flags/germany.svg') }}" alt="" />
 													</span>German</a>
                                 </div>
                                 <!--end::Menu item-->
@@ -4778,7 +4778,7 @@
                                 <div class="menu-item px-3">
                                     <a href="../../demo1/dist/account/settings.html" class="menu-link d-flex px-5">
 													<span class="symbol symbol-20px me-4">
-														<img class="rounded-1" src="assets/media/flags/japan.svg" alt="" />
+														<img class="rounded-1" src="{{ asset('assets/media/flags/japan.svg') }}" alt="" />
 													</span>Japanese</a>
                                 </div>
                                 <!--end::Menu item-->
@@ -4786,7 +4786,7 @@
                                 <div class="menu-item px-3">
                                     <a href="../../demo1/dist/account/settings.html" class="menu-link d-flex px-5">
 													<span class="symbol symbol-20px me-4">
-														<img class="rounded-1" src="assets/media/flags/france.svg" alt="" />
+														<img class="rounded-1" src="{{ asset('assets/media/flags/france.svg') }}" alt="" />
 													</span>French</a>
                                 </div>
                                 <!--end::Menu item-->

@@ -1,0 +1,280 @@
+{
+	"info": {
+		"_postman_id": "690a8658-3e4b-4228-930a-e27d26037982",
+		"name": "V2 Intention APIs KSA",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "22339621"
+	},
+	"item": [
+		{
+			"name": "Create intention",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"var jsonData = JSON.parse(responseBody);\r",
+							"\r",
+							"postman.setEnvironmentVariable(\"client_secret\", jsonData.client_secret);"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Token {{Secret_Key}}"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"amount\": {{AMOUNT_CENTS}},  // amount_cents must be equal to the sum of the items amounts\n    \"currency\": \"SAR\",  \n    \"payment_methods\": [{{Integration_ID}}], //Enter your integration ID as an Integar, you can list multiple integration IDs as -> \"payment_methods\": [{{Integration_ID_1}}, {{Integration_ID_2}}, {{Integration_ID_3}}], so the user can choose the payment method within the checkout page\n\n    \"items\": [\n        {\n            \"name\": \"Item name\",\n            \"amount\": {{AMOUNT2_CENTS}},\n            \"description\": \"Item description\",\n            \"quantity\": 1\n        },\n        {\n            \"name\": \"Item name\",\n            \"amount\": {{AMOUNT2_CENTS}},\n            \"description\": \"Item description\",\n            \"quantity\": 1\n        }\n   ],\n    \"billing_data\": {\n        \"apartment\": \"dumy\",\n        \"first_name\": \"{{First_Name}}\",  // First Name, Last Name, Phone number, & Email are mandatory fields within sending the intention request\n        \"last_name\": \"{{Last_Name}}\",\n        \"street\": \"dumy\",\n        \"building\": \"dumy\",\n        \"phone_number\": \"{{Customer_Phone_Number}}\",\n        \"city\": \"dumy\",\n        \"country\": \"dumy\",\n        \"email\": \"{{customer_email}}\",\n        \"floor\": \"dumy\",\n        \"state\": \"dumy\"\n    },\n   \n  \"extras\": {\n    \"ee\": 22\n  },\n    \"special_reference\": \"phe4sjw11q-1122-221\", // Refer to a unique or special identifier or reference associated with a transaction or order. It can be used for tracking or categorizing specific types of transactions and it returns within the transaction callback under merchant_order_id\n\n \"notification_url\":\"https://webhook.site/f60597f3-97b9-4992-90e1-6f98a63fc32d\", \n \"redirection_url\":\"https://www.google.com/\"\n//Notification and redirection URL are working only with Cards and they overlap the transaction processed and response callbacks sent per Integration ID\n     \n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://ksa.paymob.com/v1/intention/",
+					"protocol": "https",
+					"host": [
+						"ksa",
+						"paymob",
+						"com"
+					],
+					"path": [
+						"v1",
+						"intention",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Retrive Intention",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"console.log(\"Sending request to https://accept-beta.paymob.com/unifiedcheckout/?publicKey={{egy_pk_test}}&clientSecret={{egy_csk_test}}\");",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							""
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Token egy_sk_test_dfd709fb386f7ef32a904a5c6fc0769b5b0df99b577c00981d0d870f8aad9785",
+						"type": "text",
+						"disabled": true
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://ksa.paymob.com/unifiedcheckout/?publicKey={{Public_key}}&clientSecret={{client_secret}}",
+					"protocol": "https",
+					"host": [
+						"ksa",
+						"paymob",
+						"com"
+					],
+					"path": [
+						"unifiedcheckout",
+						""
+					],
+					"query": [
+						{
+							"key": "publicKey",
+							"value": "{{Public_key}}"
+						},
+						{
+							"key": "clientSecret",
+							"value": "{{client_secret}}"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Refund",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Token {{Secret_Key}}"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"transaction_id\":\"{{transaction_id}}\",\r\n  \"amount_cents\": \"{{AMOUNT_CENTS}}\" //amount to be refunded\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://ksa.paymob.com/api/acceptance/void_refund/refund",
+					"protocol": "https",
+					"host": [
+						"ksa",
+						"paymob",
+						"com"
+					],
+					"path": [
+						"api",
+						"acceptance",
+						"void_refund",
+						"refund"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Capture",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Token {{Secret_Key}}"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"transaction_id\":\"{{transaction_id}}\",\r\n  \"amount_cents\": \"{{AMOUNT_CENTS}}\" //amount to be captured\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://ksa.paymob.com/api/acceptance/capture",
+					"protocol": "https",
+					"host": [
+						"ksa",
+						"paymob",
+						"com"
+					],
+					"path": [
+						"api",
+						"acceptance",
+						"capture"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Void",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Token {{Secret_Key}}"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"transaction_id\":\"{{transaction_id}}\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://ksa.paymob.com/api/acceptance/void_refund/void",
+					"protocol": "https",
+					"host": [
+						"ksa",
+						"paymob",
+						"com"
+					],
+					"path": [
+						"api",
+						"acceptance",
+						"void_refund",
+						"void"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Moto",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Token {{Secret_Key}}"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{   \"source\": \n\t\t\t{     \n        \"identifier\": \"{{Card_Token}}\", //obtained from the save card callback\n        \"subtype\": \"TOKEN\"   \n      },  \n \"payment_token\": \"{{Payment_Key}}\" //obtained from the intention request under the Moto integration ID\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://ksa.paymob.com/api/acceptance/payments/pay",
+					"protocol": "https",
+					"host": [
+						"ksa",
+						"paymob",
+						"com"
+					],
+					"path": [
+						"api",
+						"acceptance",
+						"payments",
+						"pay"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

@@ -20,12 +20,19 @@ class DatabaseSeeder extends Seeder
 //            'email' => 'test@example.com',
 //        ]);
         $this->call([
+            SetDefaultFilesForInvestmentOpportunitiesSeeder::class,
+            BankSeeder::class,
             // Add your other seeders here
-            UserSeeder::class,
-            SurveyQuestionSeeder::class,
-            InvestmentCategorySeeder::class,
-            InvestmentOpportunitySeeder::class,
-            InvestmentSeeder::class,
+            // UserSeeder::class,
+            // SurveyQuestionSeeder::class,
+            // InvestmentCategorySeeder::class,
+            // InvestmentOpportunitySeeder::class,
+            // // InvestmentSeeder::class,
+            // AdminSeeder::class,
+            // ContentSeeder::class,
+
+            // Test and validation seeder (run last)
+
 //            SurveyOptionSeeder::class,
 //            SurveyAnswerSeeder::class,
         ]);

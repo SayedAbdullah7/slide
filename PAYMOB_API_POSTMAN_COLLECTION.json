@@ -1,0 +1,406 @@
+{
+	"info": {
+		"_postman_id": "paymob-integration-api",
+		"name": "Paymob Integration API",
+		"description": "Complete API collection for Paymob payment integration",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Authentication",
+			"item": [
+				{
+					"name": "Login",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"phone_number\": \"+966501234567\",\n    \"otp\": \"123456\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/verify-otp",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "verify-otp"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Payment Intentions",
+			"item": [
+				{
+					"name": "Create Investment Payment Intention",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"opportunity_id\": 1,\n    \"shares\": 10,\n    \"investment_type\": \"partial\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/payments/intentions",
+							"host": ["{{base_url}}"],
+							"path": ["api", "payments", "intentions"]
+						}
+					}
+				},
+				{
+					"name": "Create Wallet Charge Intention",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"amount\": 50.00\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/payments/wallet-intentions",
+							"host": ["{{base_url}}"],
+							"path": ["api", "payments", "wallet-intentions"]
+						}
+					}
+				},
+				{
+					"name": "Get Payment Intentions",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/payments/intentions?status=active&per_page=10",
+							"host": ["{{base_url}}"],
+							"path": ["api", "payments", "intentions"],
+							"query": [
+								{
+									"key": "status",
+									"value": "active"
+								},
+								{
+									"key": "per_page",
+									"value": "10"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Checkout URL",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/payments/intentions/{{intention_id}}/checkout-url",
+							"host": ["{{base_url}}"],
+							"path": ["api", "payments", "intentions", "{{intention_id}}", "checkout-url"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Payment Transactions",
+			"item": [
+				{
+					"name": "Process MOTO Payment",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"payment_intention_id\": {{intention_id}},\n    \"card_token\": \"{{card_token}}\",\n    \"payment_token\": \"{{payment_token}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/payments/moto",
+							"host": ["{{base_url}}"],
+							"path": ["api", "payments", "moto"]
+						}
+					}
+				},
+				{
+					"name": "Capture Payment",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"transaction_id\": \"{{transaction_id}}\",\n    \"amount_cents\": 10000\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/payments/capture",
+							"host": ["{{base_url}}"],
+							"path": ["api", "payments", "capture"]
+						}
+					}
+				},
+				{
+					"name": "Void Payment",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"transaction_id\": \"{{transaction_id}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/payments/void",
+							"host": ["{{base_url}}"],
+							"path": ["api", "payments", "void"]
+						}
+					}
+				},
+				{
+					"name": "Refund Payment",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"transaction_id\": \"{{transaction_id}}\",\n    \"amount_cents\": 5000\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/payments/refund",
+							"host": ["{{base_url}}"],
+							"path": ["api", "payments", "refund"]
+						}
+					}
+				},
+				{
+					"name": "Get Transactions",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/payments/transactions?status=successful&payment_method=moto&per_page=10",
+							"host": ["{{base_url}}"],
+							"path": ["api", "payments", "transactions"],
+							"query": [
+								{
+									"key": "status",
+									"value": "successful"
+								},
+								{
+									"key": "payment_method",
+									"value": "moto"
+								},
+								{
+									"key": "per_page",
+									"value": "10"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Payment Statistics",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/payments/stats",
+							"host": ["{{base_url}}"],
+							"path": ["api", "payments", "stats"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Webhooks",
+			"item": [
+				{
+					"name": "Paymob Webhook",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"obj\": {\n        \"id\": \"{{transaction_id}}\",\n        \"success\": true,\n        \"merchant_order_id\": \"{{merchant_order_id}}\",\n        \"amount_cents\": 10000,\n        \"currency\": \"SAR\"\n    }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/payments/webhooks/paymob",
+							"host": ["{{base_url}}"],
+							"path": ["api", "payments", "webhooks", "paymob"]
+						}
+					}
+				},
+				{
+					"name": "Payment Success Redirect",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{base_url}}/api/payments/webhooks/success?transaction_id={{transaction_id}}&merchant_order_id={{merchant_order_id}}&success=true",
+							"host": ["{{base_url}}"],
+							"path": ["api", "payments", "webhooks", "success"],
+							"query": [
+								{
+									"key": "transaction_id",
+									"value": "{{transaction_id}}"
+								},
+								{
+									"key": "merchant_order_id",
+									"value": "{{merchant_order_id}}"
+								},
+								{
+									"key": "success",
+									"value": "true"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Payment Failure Redirect",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{base_url}}/api/payments/webhooks/failure?transaction_id={{transaction_id}}&merchant_order_id={{merchant_order_id}}&error=payment_failed",
+							"host": ["{{base_url}}"],
+							"path": ["api", "payments", "webhooks", "failure"],
+							"query": [
+								{
+									"key": "transaction_id",
+									"value": "{{transaction_id}}"
+								},
+								{
+									"key": "merchant_order_id",
+									"value": "{{merchant_order_id}}"
+								},
+								{
+									"key": "error",
+									"value": "payment_failed"
+								}
+							]
+						}
+					}
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8000",
+			"type": "string"
+		},
+		{
+			"key": "auth_token",
+			"value": "your_auth_token_here",
+			"type": "string"
+		},
+		{
+			"key": "integration_id",
+			"value": "your_integration_id_here",
+			"type": "string"
+		},
+		{
+			"key": "intention_id",
+			"value": "1",
+			"type": "string"
+		},
+		{
+			"key": "transaction_id",
+			"value": "transaction_id_here",
+			"type": "string"
+		},
+		{
+			"key": "merchant_order_id",
+			"value": "order_123",
+			"type": "string"
+		},
+		{
+			"key": "card_token",
+			"value": "card_token_here",
+			"type": "string"
+		},
+		{
+			"key": "payment_token",
+			"value": "payment_token_here",
+			"type": "string"
+		}
+	]
+}

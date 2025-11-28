@@ -7,7 +7,44 @@ use App\Models\InvestmentOpportunity;
 use Illuminate\Support\Facades\DB;
 use Exception;
 
-// for myself investments
+/**
+ * MerchandiseService - Service for managing merchandise delivery for "myself" type investments
+ *
+ * This service handles the delivery and arrival tracking of merchandise for "myself" type investments.
+ * It manages the transition from pending delivery to arrived status when merchandise is delivered.
+ *
+ * ## Service Role:
+ * - Tracks merchandise delivery status for "myself" type investments
+ * - Manages the arrival confirmation process
+ * - Provides statistics and reporting on merchandise delivery
+ * - Handles bulk operations for marking merchandise as arrived
+ *
+ * ## Merchandise Management Conditions:
+ * - Only processes "myself" type investments (not "authorize" type)
+ * - Requires merchandise_status to be "pending" before marking as "arrived"
+ * - Cannot mark merchandise as arrived if already marked
+ * - All status changes are timestamped and logged for audit purposes
+ *
+ * ## Merchandise Delivery Process:
+ * 1. Validates investment eligibility (myself type, pending status)
+ * 2. Updates merchandise_status to "arrived"
+ * 3. Sets merchandise_arrived_at timestamp
+ * 4. Logs the delivery confirmation for audit purposes
+ * 5. Enables the investment to be ready for distribution (if applicable)
+ *
+ * ## Key Methods:
+ * - markAsArrived(): Mark merchandise as arrived for a single investment
+ * - markOpportunityMerchandiseAsArrived(): Mark merchandise as arrived for all investments in an opportunity
+ * - getPendingMerchandiseDeliveries(): Get investments waiting for merchandise delivery
+ * - getArrivedMerchandise(): Get investments with arrived merchandise
+ * - getMerchandiseStatistics(): Get delivery statistics for an opportunity
+ * - updateExpectedDeliveryDate(): Update expected delivery date for an investment
+ * - getInvestmentsByDeliveryStatus(): Get investments by specific delivery status
+ *
+ * @package App\Services
+ * @author AI Assistant
+ * @version 1.0
+ */
 class MerchandiseService
 {
     /**
@@ -48,10 +85,7 @@ class MerchandiseService
      */
     public function markOpportunityMerchandiseAsArrived(InvestmentOpportunity $opportunity): int
     {
-        $myselfInvestments = $opportunity->investments()
-            ->where('investment_type', 'myself')
-            ->where('merchandise_status', '!=', 'arrived')
-            ->get();
+        $myselfInvestments = $opportunity->investmentsNotArrivedMyself()->get();
 
         $markedCount = 0;
 
@@ -76,12 +110,12 @@ class MerchandiseService
      */
     public function getPendingMerchandiseDeliveries(InvestmentOpportunity $opportunity = null)
     {
-        $query = Investment::where('investment_type', 'myself')
-            ->where('merchandise_status', 'pending')
+        $query = Investment::myself()
+            ->statusPending()
             ->with(['opportunity', 'investor.user']);
 
         if ($opportunity) {
-            $query->where('opportunity_id', $opportunity->id);
+            $query->forOpportunity($opportunity->id);
         }
 
         return $query->get();
@@ -93,12 +127,12 @@ class MerchandiseService
      */
     public function getArrivedMerchandise(InvestmentOpportunity $opportunity = null)
     {
-        $query = Investment::where('investment_type', 'myself')
-            ->where('merchandise_status', 'arrived')
+        $query = Investment::myself()
+            ->statusArrived()
             ->with(['opportunity', 'investor.user']);
 
         if ($opportunity) {
-            $query->where('opportunity_id', $opportunity->id);
+            $query->forOpportunity($opportunity->id);
         }
 
         return $query->get();
@@ -110,18 +144,14 @@ class MerchandiseService
      */
     public function getMerchandiseStatistics(InvestmentOpportunity $opportunity): array
     {
-        $totalMyselfInvestments = $opportunity->investments()
-            ->where('investment_type', 'myself')
+        $totalMyselfInvestments = $opportunity->investmentsMyself()->count();
+
+        $arrivedInvestments = $opportunity->investmentsMyself()
+            ->statusArrived()
             ->count();
 
-        $arrivedInvestments = $opportunity->investments()
-            ->where('investment_type', 'myself')
-            ->where('merchandise_status', 'arrived')
-            ->count();
-
-        $pendingInvestments = $opportunity->investments()
-            ->where('investment_type', 'myself')
-            ->where('merchandise_status', 'pending')
+        $pendingInvestments = $opportunity->investmentsMyself()
+            ->statusPending()
             ->count();
 
         return [
@@ -155,12 +185,12 @@ class MerchandiseService
      */
     public function getInvestmentsByDeliveryStatus(string $status, InvestmentOpportunity $opportunity = null)
     {
-        $query = Investment::where('investment_type', 'myself')
+        $query = Investment::myself()
             ->where('merchandise_status', $status)
             ->with(['opportunity', 'investor.user']);
 
         if ($opportunity) {
-            $query->where('opportunity_id', $opportunity->id);
+            $query->forOpportunity($opportunity->id);
         }
 
         return $query->get();

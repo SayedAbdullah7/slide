@@ -11,9 +11,17 @@
         id="{{ $id ?? $name }}"
         class="form-control form-control-solid mb-3 mb-lg-0 {{ $class ?? '' }}"
         placeholder=""
-        value="{{$value??''}}"
-        required/>
+        value="{{ old($name, $value ?? '') }}"
+        {{ $required ?? false ? 'required' : '' }}
+        min="{{ $min ?? '' }}"
+        max="{{ $max ?? '' }}"
+    />
     <!--end::Input-->
+    <!--begin::Error Message-->
+    @error($name)
+        <div class="invalid-feedback d-block">{{ $message }}</div>
+    @enderror
+    <!--end::Error Message-->
 </div>
 <!--end::Input group-->
 

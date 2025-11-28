@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Notifications\Channels\FirebaseChannel;
+use Illuminate\Notifications\ChannelManager;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -19,6 +21,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Register Firebase notification channel
+        $this->app->make(ChannelManager::class)->extend('firebase', function ($app) {
+            return $app->make(FirebaseChannel::class);
+        });
     }
 }

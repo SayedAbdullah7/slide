@@ -15,81 +15,261 @@ class InvestmentSeeder extends Seeder
      */
     public function run(): void
     {
+        return;
+
         $faker = \Faker\Factory::create('ar_SA');
 
         // Get all available opportunities and investor profiles
-        $opportunities = InvestmentOpportunity::all();
+//        $opportunities = InvestmentOpportunity::where('status', 'open')->get();
+        $opportunities = InvestmentOpportunity::all(); // Include all opportunities for historical data
         $investorProfiles = InvestorProfile::all();
-        // $users = User::all();
 
-        if ($opportunities->isEmpty() || $investorProfiles->isEmpty() ) {
+        if ($opportunities->isEmpty() || $investorProfiles->isEmpty()) {
             $this->command->warn('Please seed InvestmentOpportunity, InvestorProfile, and User before running this seeder.');
             return;
         }
-        if(Investment::count() > 0) {
+
+        if (Investment::count() > 0) {
             $this->command->warn('Investments already seeded.');
             return;
         }
 
-        // Clear existing investments
-        // Investment::whereNotNull('id')->delete();
+        $this->command->info('🚀 Starting investment seeding...');
+        $totalInvestments = 0;
 
-        // Create 100 investment records
-        for ($i = 0; $i < 100; $i++) {
-            $opportunity = $opportunities->random();
-            $investorProfile = $investorProfiles->random();
+        // Create investments for each investor profile
+        foreach ($investorProfiles as $investorProfile) {
             $user = $investorProfile->user;
 
-            // Calculate investment details
-            $minInvestment = $opportunity->min_investment;
-            $maxInvestment = $opportunity->max_investment ?? $opportunity->target_amount;
-            $investmentAmount = $faker->randomFloat(2, $minInvestment, min($maxInvestment, 50000));
+            // Each investor will have 8-15 investments to reach ~100 total
+//            $investmentCount = $faker->numberBetween(8, 15);
+            $investmentCount = 10;
 
-            // Calculate shares based on price per share
-            $shares = floor($investmentAmount / $opportunity->price_per_share);
+            $this->command->info("Creating {$investmentCount} investments for investor: {$user->full_name}");
 
-            // Ensure we don't exceed available shares
-            if ($shares > $opportunity->available_shares) {
-                $shares = $opportunity->available_shares;
-                $investmentAmount = $shares * $opportunity->price_per_share;
+            for ($i = 0; $i < $investmentCount; $i++) {
+                // Get all opportunities that can be invested in (including completed ones for historical data)
+//                $availableOpportunities = $opportunities->filter(function ($opp) {
+//                    return $opp->status === 'open' || $opp->status === 'completed';
+//                });
+                $availableOpportunities = $opportunities;
+
+                if ($availableOpportunities->isEmpty()) {
+                    // If no opportunities available, get any opportunity for historical data
+                    $availableOpportunities = InvestmentOpportunity::all();
+                }
+
+                if ($availableOpportunities->isEmpty()) {
+                    $this->command->warn('No opportunities available for investment.');
+                    break;
+                }
+
+                $opportunity = $availableOpportunities->random();
+
+                // Calculate investment details
+                // min_investment and max_investment are now stored as number of shares
+                $minShares = max(1, (int) $opportunity->min_investment);
+                $maxShares = $opportunity->max_investment ?
+                    min((int) $opportunity->max_investment, $opportunity->available_shares) :
+                    $opportunity->available_shares;
+
+                // Ensure we have valid range
+//                if ($minShares > $maxShares) {
+//                    continue;
+//                }
+
+                $shares = $faker->numberBetween($minShares, $maxShares);
+                $investmentAmount = $shares * $opportunity->share_price;
+
+                // Skip if no shares available
+                if ($shares <= 0) {
+                    continue;
+                }
+
+                // Generate realistic investment date
+                $investmentDate = $this->generateInvestmentDate($opportunity, $faker);
+
+                // Generate realistic status based on opportunity and date
+                $status = $this->generateInvestmentStatus($opportunity, $investmentDate, $faker);
+
+                $investmentType = $faker->randomElement(['myself', 'authorize']);
+
+                try {
+                    $investmentData = [
+                        'user_id' => $user->id,
+                        'investor_id' => $investorProfile->id,
+                        'opportunity_id' => $opportunity->id,
+                        'shares' => $shares,
+                        'share_price' => $opportunity->share_price,
+                        'total_investment' => $investmentAmount,
+                        'total_payment_required' => $investmentType === 'myself' ?
+                            $investmentAmount + ($opportunity->shipping_fee_per_share * $shares) :
+                            $investmentAmount,
+                        'investment_type' => $investmentType,
+                        'status' => $status,
+                        'investment_date' => $investmentDate,
+                        'shipping_fee_per_share' => $opportunity->shipping_fee_per_share,
+                        'merchandise_status' => $faker->randomElement(['pending', 'arrived']),
+                        'distribution_status' => $faker->randomElement(['pending', 'distributed']),
+                        'created_at' => $investmentDate,
+                        'updated_at' => now(),
+                    ];
+
+                    // Set expected returns based on investment type
+                    $investmentData['expected_profit_per_share'] = $opportunity->expected_profit;
+                    $investmentData['expected_net_profit_per_share'] = $opportunity->expected_net_profit;
+
+                    if ($investmentType === 'myself') {
+                        // Set delivery date for myself investments
+                        if ($opportunity->investment_duration) {
+                            $investmentData['expected_delivery_date'] = \Carbon\Carbon::parse($investmentDate)->addDays($opportunity->investment_duration);
+                        }
+
+                        // Set merchandise arrived date if status is arrived
+                        if ($investmentData['merchandise_status'] === 'arrived') {
+                            $investmentData['merchandise_arrived_at'] = \Carbon\Carbon::parse($investmentDate)->addDays($faker->numberBetween(30, 180));
+                        }
+                    } else {
+                        // Set distribution date for authorize investments
+                        if ($opportunity->expected_distribution_date) {
+                            $investmentData['expected_distribution_date'] = $opportunity->expected_distribution_date;
+                        }
+
+                        // Set actual returns if status is completed (30% chance)
+                        if ($faker->boolean(30)) {
+                            $investmentData['actual_profit_per_share'] = $opportunity->expected_profit * $faker->randomFloat(2, 0.8, 1.2);
+                            $investmentData['actual_net_profit_per_share'] = $opportunity->expected_net_profit * $faker->randomFloat(2, 0.8, 1.2);
+                            $investmentData['actual_returns_recorded_at'] = \Carbon\Carbon::parse($investmentDate)->addDays($faker->numberBetween(60, 365));
+                        }
+                    }
+
+                    // Set distributed amount if distribution status is distributed
+                    if ($investmentData['distribution_status'] === 'distributed') {
+                        $expectedNetProfit = $investmentData['expected_net_profit_per_share'] ?? 0;
+                        $actualNetProfit = $investmentData['actual_net_profit_per_share'] ?? 0;
+                        $investmentData['distributed_profit'] = ($expectedNetProfit + $actualNetProfit) * $shares;
+                        $investmentData['distributed_at'] = \Carbon\Carbon::parse($investmentDate)->addDays($faker->numberBetween(90, 400));
+                    }
+
+                    Investment::create($investmentData);
+
+                    // Update reserved shares in the opportunity (only for open opportunities)
+                    if ($opportunity->status === 'open') {
+                        $opportunity->reserveShares($shares);
+
+                        // Update opportunity status if fully funded
+                        $opportunity->refresh();
+                        if ($opportunity->available_shares <= 0) {
+                            $opportunity->updateDynamicStatus();
+                        }
+                    }
+
+                    $totalInvestments++;
+
+                } catch (\Exception $e) {
+                    $this->command->error("Failed to create investment: " . $e->getMessage());
+                    continue;
+                }
             }
-
-            // Skip if no shares available
-            if ($shares <= 0) {
-                continue;
-            }
-
-            $investmentDate = $faker->dateTimeBetween(
-                $opportunity->offering_start_date ?? '-3 months',
-                $opportunity->offering_end_date ?? 'now'
-            );
-
-            $status = $faker->randomElement(['active', 'completed', 'cancelled', 'pending']);
-
-            // Adjust status based on opportunity status
-            if ($opportunity->status === 'completed') {
-                $status = $faker->randomElement(['completed', 'active']);
-            } elseif ($opportunity->status === 'suspended') {
-                $status = $faker->randomElement(['cancelled', 'pending']);
-            }
-
-            Investment::create([
-                'user_id' => $user->id,
-                'investor_id' => $investorProfile->id,
-                'opportunity_id' => $opportunity->id,
-                'shares' => $shares,
-                'amount' => $investmentAmount,
-                'investment_type' => $faker->randomElement(['myself', 'authorize']),
-                'status' => $status,
-                'investment_date' => $investmentDate,
-                'created_at' => $investmentDate,
-                'updated_at' => now(),
-            ]);
-
-            // Update reserved shares in the opportunity
-            $opportunity->reserveShares($shares);
         }
 
-        $this->command->info('✅ Seeded 100 investment records.');
+        $this->command->info("✅ Seeded {$totalInvestments} investment records for {$investorProfiles->count()} investors.");
+        $this->showInvestmentStats();
+    }
+
+    /**
+     * Generate realistic investment date based on opportunity timeline
+     */
+    protected function generateInvestmentDate($opportunity, $faker)
+    {
+        $now = now();
+
+        // If opportunity has offering dates, invest within that period
+        if ($opportunity->offering_start_date && $opportunity->offering_end_date) {
+            $startDate = $opportunity->offering_start_date;
+            $endDate = min($opportunity->offering_end_date, $now);
+
+            if ($startDate <= $endDate) {
+                return $faker->dateTimeBetween($startDate, $endDate);
+            }
+        }
+
+        // If opportunity has offering start date, invest after it
+        if ($opportunity->offering_start_date && $opportunity->offering_start_date <= $now) {
+            return $faker->dateTimeBetween($opportunity->offering_start_date, $now);
+        }
+
+        // Default: invest within last 6 months
+        return $faker->dateTimeBetween('-6 months', 'now');
+    }
+
+    /**
+     * Generate realistic investment status based on opportunity and date
+     */
+    protected function generateInvestmentStatus($opportunity, $investmentDate, $faker)
+    {
+        $now = now();
+        $investmentDate = \Carbon\Carbon::parse($investmentDate);
+        $daysSinceInvestment = $investmentDate->diffInDays($now);
+
+        // If opportunity is completed, investment is likely completed
+        if ($opportunity->status === 'completed') {
+            return $faker->randomElement(['completed', 'active']);
+        }
+
+        // If opportunity is suspended, investment is likely cancelled
+        if ($opportunity->status === 'suspended') {
+            return $faker->randomElement(['cancelled', 'pending']);
+        }
+
+        // If investment is very recent, it might be pending
+        if ($daysSinceInvestment < 1) {
+            return $faker->randomElement(['pending', 'active']);
+        }
+
+        // If investment is old and opportunity is still open, it's active
+        if ($daysSinceInvestment > 30) {
+            return $faker->randomElement(['active', 'completed']);
+        }
+
+        // Default distribution
+        return $faker->randomElement(['active', 'active', 'completed', 'pending']);
+    }
+
+    /**
+     * Show investment statistics
+     */
+    protected function showInvestmentStats()
+    {
+        $stats = Investment::selectRaw('
+            status,
+            investment_type,
+            merchandise_status,
+            distribution_status,
+            COUNT(*) as count,
+            SUM(total_investment) as total_amount,
+            SUM(shares) as total_shares,
+            SUM(expected_profit_per_share * shares) as total_expected_returns,
+            SUM(actual_profit_per_share * shares) as total_actual_returns,
+            SUM(distributed_profit) as total_distributed
+        ')
+        ->groupBy('status', 'investment_type', 'merchandise_status', 'distribution_status')
+        ->orderBy('count', 'desc')
+        ->get();
+
+        $this->command->info('📊 Investment Statistics:');
+        foreach ($stats as $stat) {
+            $this->command->info("  {$stat->status} ({$stat->investment_type}): {$stat->count} investments, " .
+                number_format($stat->total_amount, 2) . " SAR, {$stat->total_shares} shares");
+
+            if ($stat->investment_type === 'myself') {
+                $this->command->info("    Merchandise: {$stat->merchandise_status}, Distribution: {$stat->distribution_status}");
+            } else {
+                $expectedReturns = $stat->total_expected_returns ? number_format($stat->total_expected_returns, 2) : 'N/A';
+                $actualReturns = $stat->total_actual_returns ? number_format($stat->total_actual_returns, 2) : 'N/A';
+                $distributed = $stat->total_distributed ? number_format($stat->total_distributed, 2) : 'N/A';
+                $this->command->info("    Expected Returns: {$expectedReturns} SAR, Actual: {$actualReturns} SAR, Distributed: {$distributed} SAR");
+            }
+        }
     }
 }

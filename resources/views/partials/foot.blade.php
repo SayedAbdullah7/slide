@@ -9,6 +9,7 @@
 
 <!--begin::Vendors Javascript (used for this page only)-->
 <script src="{{ asset('assets/plugins/custom/fullcalendar/fullcalendar.bundle.js') }}"></script>
+{{-- <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script> --}}
 <script src="https://cdn.amcharts.com/lib/5/index.js"></script>
 <script src="https://cdn.amcharts.com/lib/5/xy.js"></script>
 <script src="https://cdn.amcharts.com/lib/5/percent.js"></script>
@@ -24,12 +25,12 @@
 <!--end::Vendors Javascript-->
 
 <!--begin::Custom Javascript (used for this page only)-->
-<script src="{{ asset('assets/js/widgets.bundle.js') }}"></script>
+{{-- {{-- <script src="{{ asset('assets/js/widgets.bundle.js') }}"></script> --}}
 <script src="{{ asset('assets/js/custom/widgets.js') }}"></script>
-<script src="{{ asset('assets/js/custom/apps/chat/chat.js') }}"></script>
-<script src="{{ asset('assets/js/custom/utilities/modals/upgrade-plan.js') }}"></script>
-<script src="{{ asset('assets/js/custom/utilities/modals/create-app.js') }}"></script>
-<script src="{{ asset('assets/js/custom/utilities/modals/new-target.js') }}"></script>
-<script src="{{ asset('assets/js/custom/utilities/modals/users-search.js') }}"></script>
+{{-- <script src="{{ asset('assets/js/custom/apps/chat/chat.js') }}"></script> --}}
+{{-- <script src="{{ asset('assets/js/custom/utilities/modals/upgrade-plan.js') }}"></script> --}}
+{{-- <script src="{{ asset('assets/js/custom/utilities/modals/create-app.js') }}"></script> --}}
+{{-- <script src="{{ asset('assets/js/custom/utilities/modals/new-target.js') }}"></script> --}}
+{{-- <script src="{{ asset('assets/js/custom/utilities/modals/users-search.js') }}"></script> --}} --}}
 <!--end::Custom Javascript-->
 <!--end::Javascript-->

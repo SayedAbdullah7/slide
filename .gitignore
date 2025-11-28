@@ -23,3 +23,7 @@ Homestead.json
 Homestead.yaml
 Thumbs.db
 /.history
+/public/assets
+/public/images
+/demo1
+

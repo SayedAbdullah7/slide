@@ -12,4 +12,18 @@ enum FundGoalEnum: string
     {
         return array_column(self::cases(), 'value');
     }
+
+    public static function labels(): array
+    {
+        return [
+            self::GROWTH->value => 'نمو',
+            self::STABILITY->value => 'استقرار',
+            self::INCOME->value => 'دخل',
+        ];
+    }
+
+    public static function label(string $value): string
+    {
+        return self::labels()[$value] ?? $value;
+    }
 }

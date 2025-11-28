@@ -46,4 +46,22 @@ class Admin extends Authenticatable
             'is_active' => 'boolean',
         ];
     }
+
+
+
+    public function initials(): string
+    {
+        $name = $this->name ?? '';
+        $words = explode(' ', $name);
+        $initials = '';
+
+        foreach ($words as $word) {
+            if (!empty($word)) {
+                $initials .= strtoupper(mb_substr($word, 0, 1));
+            }
+        }
+
+        return $initials;
+    }
+
 }

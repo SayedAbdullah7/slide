@@ -15,6 +15,8 @@ return new class extends Migration
             $table->id();
             $table->string('name')->unique(); // e.g. Real Estate, Agriculture, etc.
             $table->text('description')->nullable();
+            $table->string('icon')->nullable();
+            $table->boolean('is_active')->default(true);
             $table->timestamps();
         });
     }

@@ -51,17 +51,35 @@ class DynamicTable extends Component
         if ($this->showCheckbox) {
             $JsColumns[] = ['data' => '', 'name' => ''];
         }
+
+        // Convert Collection to array if needed
+        $columnsArray = $this->columns instanceof \Illuminate\Support\Collection
+            ? $this->columns->toArray()
+            : $this->columns;
+
         $JsColumns = array_merge($JsColumns, array_map(function($item) {
             if (!is_array($item)){
                 $item = $item->toArray();
             }
-            return [
-                'data' => $item['name'],
-                'name' => $item['name'],
+            $column = [
+                'data' => $item['name'] ?? $item['data'] ?? '',
+                'name' => $item['name'] ?? $item['data'] ?? '',
+                'title' => $item['title'] ?? ucfirst(str_replace('_', ' ', $item['name'] ?? $item['data'] ?? '')),
                 'searchable' => $item['searchable'] ?? true,
                 'orderable' => $item['orderable'] ?? true,
+                'visible' => $item['visible'] ?? true,
             ];
-        }, $this->columns));
+
+            // Include className and width if they exist
+            if (isset($item['className'])) {
+                $column['className'] = $item['className'];
+            }
+            if (isset($item['width'])) {
+                $column['width'] = $item['width'];
+            }
+
+            return $column;
+        }, $columnsArray));
 
         if ($this->actions) {
             $JsColumns[] = ['data' => null, 'name' => null];

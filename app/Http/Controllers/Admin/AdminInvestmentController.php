@@ -91,25 +91,52 @@ class AdminInvestmentController extends Controller
     }
 
     /**
-     * Process actual returns recording
-     * معالجة تسجيل العوائد الفعلية
+     * Process actual profit per share recording
+     * معالجة تسجيل الربح الفعلي لكل سهم
      */
-    public function processActualReturns(Request $request, InvestmentOpportunity $opportunity): JsonResponse
+    public function processActualProfitPerShare(Request $request, InvestmentOpportunity $opportunity): JsonResponse
     {
         $request->validate([
             'returns_data' => 'required|array',
-            'returns_data.*.actual_return_amount' => 'required|numeric|min:0',
-            'returns_data.*.actual_net_return' => 'required|numeric|min:0',
+            'returns_data.*.actual_profit_per_share' => 'required|numeric|min:0',
+            'returns_data.*.actual_net_profit_per_share' => 'required|numeric|min:0',
         ]);
 
         try {
-            $result = $this->adminService->processActualReturnsRecording($opportunity, $request->returns_data);
+            $result = $this->adminService->processActualProfitPerShareRecording($opportunity, $request->returns_data);
 
             return response()->json($result);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'فشل في تسجيل العوائد الفعلية: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Process actual profit per share for all authorize investments
+     * معالجة الربح الفعلي لكل سهم لجميع الاستثمارات المفوضة
+     */
+    public function processActualProfitForAllAuthorize(Request $request, InvestmentOpportunity $opportunity): JsonResponse
+    {
+        $request->validate([
+            'actual_profit_per_share' => 'required|numeric|min:0',
+            'actual_net_profit_per_share' => 'required|numeric|min:0',
+        ]);
+
+        try {
+            $result = $this->adminService->processActualProfitForAllAuthorizeInvestments(
+                $opportunity,
+                $request->actual_profit_per_share,
+                $request->actual_net_profit_per_share
+            );
+
+            return response()->json($result);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'فشل في تسجيل الربح الفعلي للاستثمارات المفوضة: ' . $e->getMessage(),
             ], 500);
         }
     }

@@ -43,7 +43,7 @@
 
 <!--begin::Javascript-->
 @include('partials.foot')
-<script src="{{asset('js/main.js')}}"></script>
+<script src="{{ asset('js/main.js') }}?v={{ uniqid() }}"></script>
 <script>
     $.ajaxSetup({
         headers: {

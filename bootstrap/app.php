@@ -1,6 +1,8 @@
 <?php
 
+use App\Exceptions\GlobalApiExceptionHandler;
 use App\Http\Middleware\InjectCurrentProfile;
+use App\Http\Middleware\OptionalAuth;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -16,7 +18,14 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->api(append: [
             InjectCurrentProfile::class,
         ]);
+
+        $middleware->alias([
+            'optional.auth' => OptionalAuth::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        // Global API exception handler using ApiResponseTrait structure
+        $exceptions->render(function (Exception $e, $request) {
+            return GlobalApiExceptionHandler::handleApiException($e, $request);
+        });
     })->create();

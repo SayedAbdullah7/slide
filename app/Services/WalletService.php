@@ -147,9 +147,24 @@ class WalletService
 
     /**
      * الحصول على رصيد محفظة محددة
+     * Use this method consistently across all APIs to ensure the same balance value
+     * This method uses the same logic as InvestorProfile::getWalletBalance() for consistency
      */
     public function getWalletBalance($wallet): float
     {
+        // Check if wallet exists
+        if (!$wallet) {
+            return 0.0;
+        }
+
+        // Use the same logic as InvestorProfile::getWalletBalance() for consistency
+        // Check if wallet has the hasWallet method (for InvestorProfile/OwnerProfile)
+        if (method_exists($wallet, 'hasWallet')) {
+            return $wallet->hasWallet() ? ($wallet->balance ?? 0.0) : 0.0;
+        }
+
+        // If wallet doesn't have hasWallet method, try to get balance directly
+        // This handles cases where the wallet might be a direct wallet model
         return $wallet->balance ?? 0.0;
     }
 

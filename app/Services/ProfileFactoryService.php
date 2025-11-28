@@ -17,9 +17,18 @@ class ProfileFactoryService
         if ($user->hasInvestor()) {
             throw ValidationException::withMessages(['investor' => 'Investor profile already exists.']);
         }
-        return $user->investorProfile()->create([
-            'extra_data' => $data['extra_data'] ?? null,
+
+        $profile = $user->investorProfile()->create([
+            'full_name'    => $data['full_name'] ?? null,
+            'birth_date'   => $data['birth_date'] ?? null,
+            'national_id'  => $data['national_id'] ?? null,
+            'extra_data'   => $data['extra_data'] ?? null,
         ]);
+
+        // Always set active_profile_type to the newly created profile
+        $user->update(['active_profile_type' => User::PROFILE_INVESTOR]);
+
+        return $profile;
     }
 
     /**
@@ -30,10 +39,16 @@ class ProfileFactoryService
         if ($user->hasOwner()) {
             throw ValidationException::withMessages(['owner' => 'Owner profile already exists.']);
         }
-        return $user->ownerProfile()->create([
-//            'company_name' => $data['company_name'] ?? throw ValidationException::withMessages(['company_name' => 'Required']),
-            'tax_number'   => $data['tax_number'] ?? null,
+
+        $profile = $user->ownerProfile()->create([
+            'business_name' => $data['business_name'] ?? null,
+            'tax_number'    => $data['tax_number'] ?? null,
         ]);
+
+        // Always set active_profile_type to the newly created profile
+        $user->update(['active_profile_type' => User::PROFILE_OWNER]);
+
+        return $profile;
     }
 
     public function switch(User $user, string $toType): User
@@ -58,6 +73,6 @@ class ProfileFactoryService
 
         $user->forceFill(['active_profile_type' => $toType])->save();
 
-        return $user->fresh(['investorProfile','ownerProfile']);
+        return $user->fresh(['investorProfile', 'ownerProfile']);
     }
 }

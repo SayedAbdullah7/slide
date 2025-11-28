@@ -7,27 +7,66 @@ use App\Models\InvestmentOpportunity;
 use Illuminate\Support\Facades\DB;
 use Exception;
 
-// for authorize investments
+/**
+ * ReturnsService - Service for managing investment returns recording
+ *
+ * This service handles the recording of actual returns for "authorize" type investments.
+ * It manages the transition from expected returns to actual returns when sales are completed.
+ *
+ * ## Service Role:
+ * - Records actual profit and net profit per share for authorize investments
+ * - Manages the transition from expected to actual returns
+ * - Provides statistics and reporting on returns recording
+ * - Handles bulk operations for recording returns across multiple investments
+ *
+ * ## Returns Recording Conditions:
+ * - Only processes "authorize" type investments (not "myself" type)
+ * - Requires actual_profit_per_share and actual_net_profit_per_share values
+ * - Investment must not have already recorded actual returns
+ * - All recordings are timestamped and logged for audit purposes
+ *
+ * ## Returns Recording Process:
+ * 1. Validates investment eligibility (authorize type, not already recorded)
+ * 2. Records actual profit per share and actual net profit per share
+ * 3. Sets actual_returns_recorded_at timestamp
+ * 4. Logs the recording activity for audit purposes
+ * 5. Enables the investment to be ready for distribution
+ *
+ * ## Key Methods:
+ * - recordActualProfitPerShare(): Record returns for a single investment
+ * - recordOpportunityActualProfitPerShare(): Record returns for multiple investments with custom data
+ * - recordActualProfitForAllAuthorizeInvestments(): Record same returns for all investments
+ * - getExpectedReturns(): Get expected returns data
+ * - getActualReturns(): Get actual returns data
+ * - getReturnsComparison(): Compare expected vs actual returns
+ * - getOpportunityReturnsStatistics(): Get statistics for an opportunity
+ * - getPendingActualReturns(): Get investments waiting for returns recording
+ * - getRecordedActualReturns(): Get investments with recorded returns
+ *
+ * @package App\Services
+ * @author AI Assistant
+ * @version 1.0
+ */
 class ReturnsService
 {
     /**
-     * Record actual returns for an investment (for authorize type)
-     * تسجيل العوائد الفعلية لاستثمار (للنوع المفوض)
+     * Record actual profit per share for an investment (for authorize type)
+     * تسجيل الربح الفعلي لكل سهم لاستثمار (للنوع المفوض)
      */
-    public function recordActualReturns(Investment $investment, float $actualReturnAmount, float $actualNetReturn): bool
+    public function recordActualProfitPerShare(Investment $investment, float $actualProfitPerShare, float $actualNetProfitPerShare): bool
     {
         if ($investment->investment_type !== 'authorize') {
             throw new Exception('يمكن فقط تسجيل العوائد الفعلية للاستثمارات من نوع "تفويض بالبيع"');
         }
 
-        if ($investment->actual_return_amount !== null) {
+        if ($investment->actual_profit_per_share !== null) {
             throw new Exception('العوائد الفعلية مسجلة مسبقاً لهذا الاستثمار');
         }
 
-        return DB::transaction(function () use ($investment, $actualReturnAmount, $actualNetReturn) {
+        return DB::transaction(function () use ($investment, $actualProfitPerShare, $actualNetProfitPerShare) {
             $investment->update([
-                'actual_return_amount' => $actualReturnAmount,
-                'actual_net_return' => $actualNetReturn,
+                'actual_profit_per_share' => $actualProfitPerShare,
+                'actual_net_profit_per_share' => $actualNetProfitPerShare,
                 'actual_returns_recorded_at' => now(),
             ]);
 
@@ -36,8 +75,8 @@ class ReturnsService
                 'investment_id' => $investment->id,
                 'opportunity_id' => $investment->opportunity_id,
                 'investor_id' => $investment->investor_id,
-                'actual_return_amount' => $actualReturnAmount,
-                'actual_net_return' => $actualNetReturn,
+                'actual_profit_per_share' => $actualProfitPerShare,
+                'actual_net_profit_per_share' => $actualNetProfitPerShare,
             ]);
 
             return true;
@@ -45,14 +84,13 @@ class ReturnsService
     }
 
     /**
-     * Record actual returns for all authorize investments in an opportunity
-     * تسجيل العوائد الفعلية لجميع الاستثمارات المفوضة في فرصة معينة
+     * Record actual profit per share for all authorize investments in an opportunity
+     * تسجيل الربح الفعلي لكل سهم لجميع الاستثمارات المفوضة في فرصة معينة
      */
-    public function recordOpportunityActualReturns(InvestmentOpportunity $opportunity, array $returnsData): int
+    public function recordOpportunityActualProfitPerShare(InvestmentOpportunity $opportunity, array $profitData): int
     {
-        $authorizeInvestments = $opportunity->investments()
-            ->where('investment_type', 'authorize')
-            ->whereNull('actual_return_amount')
+        $authorizeInvestments = $opportunity->investmentsAuthorize()
+            ->whereNull('actual_profit_per_share')
             ->get();
 
         $recordedCount = 0;
@@ -61,11 +99,11 @@ class ReturnsService
             try {
                 $investorId = $investment->investor_id;
 
-                if (isset($returnsData[$investorId])) {
-                    $this->recordActualReturns(
+                if (isset($profitData[$investorId])) {
+                    $this->recordActualProfitPerShare(
                         $investment,
-                        $returnsData[$investorId]['actual_return_amount'],
-                        $returnsData[$investorId]['actual_net_return']
+                        $profitData[$investorId]['actual_profit_per_share'],
+                        $profitData[$investorId]['actual_net_profit_per_share']
                     );
                     $recordedCount++;
                 }
@@ -86,22 +124,11 @@ class ReturnsService
      */
     public function getExpectedReturns(Investment $investment): array
     {
-        $opportunity = $investment->opportunity;
-        $shares = $investment->shares;
-
-        if ($investment->investment_type === 'myself') {
-            return [
-                'expected_return_amount' => $shares * ($opportunity->expected_return_amount_by_myself ?? 0),
-                'expected_net_return' => $shares * ($opportunity->expected_net_return_by_myself ?? 0),
-                'shipping_and_service_fee' => $shares * ($opportunity->shipping_and_service_fee ?? 0),
-            ];
-        } else {
-            return [
-                'expected_return_amount' => $shares * ($opportunity->expected_return_amount_by_authorize ?? 0),
-                'expected_net_return' => $shares * ($opportunity->expected_net_return_by_authorize ?? 0),
-                'shipping_and_service_fee' => 0, // No shipping fee for authorize type
-            ];
-        }
+        return [
+            'expected_profit_amount' => $investment->getTotalExpectedProfitAmount(),
+            'expected_net_profit' => $investment->getTotalExpectedNetProfit(),
+            'shipping_fee' => $investment->getTotalShippingAndServiceFee(),
+        ];
     }
 
     /**
@@ -111,8 +138,8 @@ class ReturnsService
     public function getActualReturns(Investment $investment): array
     {
         return [
-            'actual_return_amount' => $investment->actual_return_amount ?? 0,
-            'actual_net_return' => $investment->actual_net_return ?? 0,
+            'actual_profit_amount' => $investment->getTotalActualProfitAmount(),
+            'actual_net_profit' => $investment->getTotalActualNetProfit(),
             'returns_recorded_at' => $investment->actual_returns_recorded_at,
         ];
     }
@@ -126,22 +153,22 @@ class ReturnsService
         $expected = $this->getExpectedReturns($investment);
         $actual = $this->getActualReturns($investment);
 
-        $returnVariance = $actual['actual_return_amount'] - $expected['expected_return_amount'];
-        $netReturnVariance = $actual['actual_net_return'] - $expected['expected_net_return'];
+        $profitVariance = $actual['actual_profit_amount'] - $expected['expected_profit_amount'];
+        $netProfitVariance = $actual['actual_net_profit'] - $expected['expected_net_profit'];
 
         return [
             'expected' => $expected,
             'actual' => $actual,
             'variance' => [
-                'return_amount' => $returnVariance,
-                'net_return' => $netReturnVariance,
+                'profit_amount' => $profitVariance,
+                'net_profit' => $netProfitVariance,
             ],
             'performance' => [
-                'return_percentage' => $expected['expected_return_amount'] > 0
-                    ? round(($returnVariance / $expected['expected_return_amount']) * 100, 2)
+                'profit_percentage' => $expected['expected_profit_amount'] > 0
+                    ? round(($profitVariance / $expected['expected_profit_amount']) * 100, 2)
                     : 0,
-                'net_return_percentage' => $expected['expected_net_return'] > 0
-                    ? round(($netReturnVariance / $expected['expected_net_return']) * 100, 2)
+                'net_profit_percentage' => $expected['expected_net_profit'] > 0
+                    ? round(($netProfitVariance / $expected['expected_net_profit']) * 100, 2)
                     : 0,
             ],
         ];
@@ -153,9 +180,7 @@ class ReturnsService
      */
     public function getOpportunityReturnsStatistics(InvestmentOpportunity $opportunity): array
     {
-        $authorizeInvestments = $opportunity->investments()
-            ->where('investment_type', 'authorize')
-            ->get();
+        $authorizeInvestments = $opportunity->investmentsAuthorize()->get();
 
         $totalExpectedReturn = 0;
         $totalActualReturn = 0;
@@ -163,11 +188,11 @@ class ReturnsService
 
         foreach ($authorizeInvestments as $investment) {
             $expected = $this->getExpectedReturns($investment);
-            $totalExpectedReturn += $expected['expected_return_amount'];
+            $totalExpectedReturn += $expected['expected_profit_amount'];
 
-            if ($investment->actual_return_amount !== null) {
+            if ($investment->actual_profit_per_share !== null) {
                 $actual = $this->getActualReturns($investment);
-                $totalActualReturn += $actual['actual_return_amount'];
+                $totalActualReturn += $actual['actual_profit_amount'];
                 $recordedReturns++;
             }
         }
@@ -190,12 +215,12 @@ class ReturnsService
      */
     public function getPendingActualReturns(InvestmentOpportunity $opportunity = null)
     {
-        $query = Investment::where('investment_type', 'authorize')
-            ->whereNull('actual_return_amount')
+        $query = Investment::authorize()
+            ->whereNull('actual_profit_per_share')
             ->with(['opportunity', 'investor.user']);
 
         if ($opportunity) {
-            $query->where('opportunity_id', $opportunity->id);
+            $query->forOpportunity($opportunity->id);
         }
 
         return $query->get();
@@ -207,12 +232,12 @@ class ReturnsService
      */
     public function getRecordedActualReturns(InvestmentOpportunity $opportunity = null)
     {
-        $query = Investment::where('investment_type', 'authorize')
-            ->whereNotNull('actual_return_amount')
+        $query = Investment::authorize()
+            ->withActualReturns()
             ->with(['opportunity', 'investor.user']);
 
         if ($opportunity) {
-            $query->where('opportunity_id', $opportunity->id);
+            $query->forOpportunity($opportunity->id);
         }
 
         return $query->get();
@@ -224,15 +249,57 @@ class ReturnsService
      */
     public function allAuthorizeReturnsRecorded(InvestmentOpportunity $opportunity): bool
     {
-        $totalAuthorizeInvestments = $opportunity->investments()
-            ->where('investment_type', 'authorize')
-            ->count();
+        $totalAuthorizeInvestments = $opportunity->investmentsAuthorize()->count();
 
-        $recordedInvestments = $opportunity->investments()
-            ->where('investment_type', 'authorize')
-            ->whereNotNull('actual_return_amount')
+        $recordedInvestments = $opportunity->investmentsAuthorize()
+            ->withActualReturns()
             ->count();
 
         return $totalAuthorizeInvestments > 0 && $totalAuthorizeInvestments === $recordedInvestments;
+    }
+
+    /**
+     * Record actual profit per share for all authorize investments in an opportunity with same values
+     * تسجيل الربح الفعلي لكل سهم لجميع الاستثمارات المفوضة في فرصة معينة بنفس القيم
+     */
+    public function recordActualProfitForAllAuthorizeInvestments(
+        InvestmentOpportunity $opportunity,
+        float $actualProfitPerShare,
+        float $actualNetProfitPerShare
+    ): array {
+        $authorizeInvestments = $opportunity->investmentsAuthorize()
+            ->whereNull('actual_profit_per_share') // Only process investments that haven't been recorded yet
+            ->get();
+
+        $recordedCount = 0;
+        $errors = [];
+
+        foreach ($authorizeInvestments as $investment) {
+            try {
+                $this->recordActualProfitPerShare(
+                    $investment,
+                    $actualProfitPerShare,
+                    $actualNetProfitPerShare
+                );
+                $recordedCount++;
+            } catch (Exception $e) {
+                $errors[] = [
+                    'investment_id' => $investment->id,
+                    'investor_id' => $investment->investor_id,
+                    'error' => $e->getMessage(),
+                ];
+                \Log::error('Failed to record actual profit for investment', [
+                    'investment_id' => $investment->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return [
+            'total_authorize_investments' => $authorizeInvestments->count(),
+            'recorded_count' => $recordedCount,
+            'errors' => $errors,
+            'success' => $recordedCount > 0,
+        ];
     }
 }

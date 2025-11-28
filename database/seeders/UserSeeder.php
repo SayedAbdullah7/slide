@@ -43,11 +43,8 @@ class UserSeeder extends Seeder
     private function createAdminUser(): void
     {
         User::create([
-            'full_name' => 'Admin User',
             'phone' => '+1234567890',
             'email' => 'admin@slide.com',
-            'national_id' => '123456789012345',
-            'birth_date' => '1985-01-01',
             'password' => Hash::make('password'),
             'is_active' => true,
             'is_registered' => true,
@@ -60,11 +57,8 @@ class UserSeeder extends Seeder
     {
         for ($i = 0; $i < 5; $i++) {
             $user = User::create([
-                'full_name' => $faker->name(),
                 'phone' => $faker->unique()->phoneNumber(),
                 'email' => $faker->unique()->safeEmail(),
-                'national_id' => $faker->unique()->numerify('##############'),
-                'birth_date' => $faker->date('Y-m-d', '2000-01-01'),
                 'password' => Hash::make('password'),
                 'is_active' => true,
                 'is_registered' => true,
@@ -76,6 +70,9 @@ class UserSeeder extends Seeder
             // Create investor profile
             InvestorProfile::create([
                 'user_id' => $user->id,
+                'full_name' => $faker->name(),
+                'national_id' => $faker->unique()->numerify('##############'),
+                'birth_date' => $faker->date('Y-m-d', '2000-01-01'),
                 'extra_data' => json_encode([
                     'investment_preferences' => $faker->randomElements(['real_estate', 'stocks', 'bonds', 'crypto'], 2),
                     'risk_tolerance' => $faker->randomElement(['low', 'medium', 'high']),
@@ -90,11 +87,8 @@ class UserSeeder extends Seeder
     {
         for ($i = 0; $i < 5; $i++) {
             $user = User::create([
-                'full_name' => $faker->name(),
                 'phone' => $faker->unique()->phoneNumber(),
                 'email' => $faker->unique()->safeEmail(),
-                'national_id' => $faker->unique()->numerify('##############'),
-                'birth_date' => $faker->date('Y-m-d', '2000-01-01'),
                 'password' => Hash::make('password'),
                 'is_active' => true,
                 'is_registered' => true,
@@ -117,11 +111,8 @@ class UserSeeder extends Seeder
     {
         for ($i = 0; $i < 3; $i++) {
             $user = User::create([
-                'full_name' => $faker->name(),
                 'phone' => $faker->unique()->phoneNumber(),
                 'email' => $faker->unique()->safeEmail(),
-                'national_id' => $faker->unique()->numerify('##############'),
-                'birth_date' => $faker->date('Y-m-d', '2000-01-01'),
                 'password' => Hash::make('password'),
                 'is_active' => true,
                 'is_registered' => true,
@@ -133,6 +124,9 @@ class UserSeeder extends Seeder
             // Create investor profile
             InvestorProfile::create([
                 'user_id' => $user->id,
+                'full_name' => $faker->name(),
+                'national_id' => $faker->unique()->numerify('##############'),
+                'birth_date' => $faker->date('Y-m-d', '2000-01-01'),
                 'extra_data' => json_encode([
                     'investment_preferences' => $faker->randomElements(['real_estate', 'stocks', 'bonds', 'crypto'], 2),
                     'risk_tolerance' => $faker->randomElement(['low', 'medium', 'high']),

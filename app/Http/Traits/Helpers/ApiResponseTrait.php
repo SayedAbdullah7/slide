@@ -148,7 +148,7 @@ trait ApiResponseTrait
      */
     protected function respondUnAuthorized(string $message = 'Unauthorized'): JsonResponse
     {
-        return $this->respondError($message, 401);
+        return $this->respondError($message, 401,null,401);
     }
 
     protected function respondForbidden(string $message = 'Forbidden'): JsonResponse
@@ -189,13 +189,14 @@ trait ApiResponseTrait
     /**
      * Respond with error.
      */
-    protected function respondError($message, int $statusCode = 400, Exception $exception = null, int|string $error_code = 1): JsonResponse
+    protected function respondError($message, int $statusCode = 400, Exception $exception = null, int|string $error_code = 1, $result = null): JsonResponse
     {
         return $this->apiResponse([
             'success' => false,
             'message' => $message ?? 'There was an internal error, please try again later',
             'exception' => $exception,
-            'error_code' => $error_code
+            'error_code' => $error_code,
+            'result' => $result
         ], $statusCode);
     }
 
@@ -208,6 +209,23 @@ trait ApiResponseTrait
             'success' => false,
             'message' => $exception->getMessage(),
             'errors' => $exception->errors()
+        ], 422);
+    }
+
+    /**
+     * Respond with validation errors from validator instance (422).
+     */
+    protected function respondValidationError($errors, string $message = null): JsonResponse
+    {
+        // If no custom message provided, use a generic Arabic message
+        if ($message === null) {
+            $message = 'يرجى تصحيح الأخطاء التالية';
+        }
+
+        return $this->apiResponse([
+            'success' => false,
+            'message' => $message,
+            'errors' => $errors
         ], 422);
     }
 
