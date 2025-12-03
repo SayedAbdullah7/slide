@@ -155,7 +155,7 @@ class InvestmentService
         return DB::transaction(function () use ($existingInvestment, $additionalShares, $additionalAmount, $additionalPaymentRequired, $opportunity, $skipWalletPayment) {
             // Process wallet payment for additional shares
             if (!$skipWalletPayment) {
-                $this->processWalletPayment($existingInvestment->investor, $additionalAmount, $opportunity);
+                $this->processWalletPayment($existingInvestment->investor, $additionalPaymentRequired, $opportunity);
             }
 
             // Update investment record
@@ -202,7 +202,7 @@ class InvestmentService
         return DB::transaction(function () use ($investor, $opportunity, $shares, $amount, $totalPaymentRequired, $investmentType, $skipWalletPayment) {
             // Process wallet payment
             if (!$skipWalletPayment) {
-                $this->processWalletPayment($investor, $amount, $opportunity);
+                $this->processWalletPayment($investor, $totalPaymentRequired, $opportunity);
             }
 
             // Create investment record using factory pattern

@@ -43,7 +43,7 @@ trait ApiResponseTrait
     protected function parseGivenData(array $data = [], int $statusCode = 200, array $headers = []): array
     {
         $responseStructure = [
-            'success' => $data['success'],
+            'success' => $data['success'] ?? true,
             'message' => $data['message'] ?? null,
             'result' => $data['result'] ?? null,
         ];

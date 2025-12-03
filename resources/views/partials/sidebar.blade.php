@@ -471,6 +471,11 @@ if (isset($_COOKIE["sidebar_minimize_state"]) && $_COOKIE["sidebar_minimize_stat
                                 'title' => 'Investment Categories',
                                 'icon' => 'ki-category'
                             ],
+                            [
+                                'route' => 'admin.app-versions.index',
+                                'title' => 'App Versions',
+                                'icon' => 'ki-monitor-mobile'
+                            ],
                         ];
                     @endphp
 

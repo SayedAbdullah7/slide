@@ -24,6 +24,7 @@ use App\Http\Controllers\ContactMessageController;
 use App\Http\Controllers\BankController;
 use App\Http\Controllers\InvestmentCategoryController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\Admin\AppVersionController;
 
 Route::prefix('admin')->name('admin.')->middleware(['auth'])->group(function () {
 
@@ -305,5 +306,20 @@ Route::prefix('admin')->name('admin.')->middleware(['auth'])->group(function () 
         ->name('investment-categories.index');
     Route::resource('investment-categories', InvestmentCategoryController::class)
         ->except(['index']);
+
+    // ============================================
+    // App Version Management Routes
+    // ============================================
+    Route::get('/app-versions', [AppVersionController::class, 'index'])
+        ->name('app-versions.index');
+    Route::resource('app-versions', AppVersionController::class)
+        ->except(['index']);
+
+    // App Version - Admin Actions
+    Route::prefix('app-versions')->name('app-versions.')->group(function () {
+        // Toggle active status
+        Route::post('{appVersion}/toggle-status', [AppVersionController::class, 'toggleStatus'])
+            ->name('toggle-status');
+    });
 
 });

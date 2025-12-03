@@ -403,4 +403,9 @@ Route::prefix('paymob')->controller(\App\Http\Controllers\Api\PaymentWebhookCont
     Route::post('tokenized-callback', 'tokenizedCallback')->name('api.paymob.tokenized-callback');
 });
 
+// App Version Check API (Public - no authentication required)
+Route::prefix('app-version')->controller(\App\Http\Controllers\Api\AppVersionController::class)->group(function () {
+    Route::post('check-update', 'checkUpdate')->name('api.app-version.check-update');
+});
+
 //});

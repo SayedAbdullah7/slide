@@ -3,6 +3,7 @@
 use App\Exceptions\GlobalApiExceptionHandler;
 use App\Http\Middleware\InjectCurrentProfile;
 use App\Http\Middleware\OptionalAuth;
+use App\Http\Middleware\CheckAppVersion;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -17,10 +18,12 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->api(append: [
             InjectCurrentProfile::class,
+            CheckAppVersion::class,
         ]);
 
         $middleware->alias([
             'optional.auth' => OptionalAuth::class,
+            'check.app.version' => CheckAppVersion::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

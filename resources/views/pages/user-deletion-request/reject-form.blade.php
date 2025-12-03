@@ -21,8 +21,8 @@
     <!-- User Info (Readonly) -->
     <div class="fv-row mb-7">
         <label class="fw-semibold fs-6 mb-2">User</label>
-        <input type="text" 
-               class="form-control form-control-solid" 
+        <input type="text"
+               class="form-control form-control-solid"
                value="{{ $model->user ? $model->user->display_name . ' (' . $model->user->phone . ')' : 'N/A' }}"
                readonly
                style="background-color: #f0f0f0; color: #888; cursor: not-allowed;">

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreInvestmentOpportunityRequestRequest;
 use App\Http\Resources\InvestmentOpportunityRequestResource;
 use App\Http\Resources\InvestmentOpportunityResource;
+use App\Http\Resources\UserResource;
 use App\Http\Traits\Helpers\ApiResponseTrait;
 use App\Models\InvestmentOpportunityRequest;
 use App\Models\InvestmentOpportunity;
@@ -247,6 +248,7 @@ class OwnerOpportunityRequestController extends Controller
      */
     public function getDashboard(Request $request): JsonResponse
     {
+        $user = $request->user();
         $ownerProfile = $this->getOwnerProfile($request);
 
         if (!$ownerProfile) {
@@ -290,6 +292,15 @@ class OwnerOpportunityRequestController extends Controller
             ],
             'last_investment_opportunity' => $latestProject ? new InvestmentOpportunityResource($latestProject) : null
         ];
+
+        // Add user data like login response
+        if ($user) {
+            $user->loadMissing('investorProfile', 'ownerProfile');
+            $dashboardData['user'] = new UserResource($user);
+            $dashboardData['active_profile_type'] = $user->active_profile_type;
+            $dashboardData['notifications_enabled'] = (bool) $user->notifications_enabled;
+            $dashboardData['has_password'] = $user->hasPassword();
+        }
 
         return $this->respondSuccessWithData('', $dashboardData);
     }

@@ -52,21 +52,10 @@ class PaymentController extends Controller
                 ], $userId, $result['intention']->id ?? null, null, 'intention_created');
 
 
-                $intention = $result['intention'];
-
-                return response()->json([
-                    'success' => true,
-                            'message' => 'Wallet charging intention created successfully',
-                    'data' => array_merge($result['data'], [
-                                'amount_sar' => 100 / 100,
-                                'operation_type' => 'wallet_charge',
-                    ])
-                ], 201);
-
                 return $this->respondCreated([
                     'success' => true,
                     'message' => 'Payment intention created successfully',
-                    'result' => $result['data']
+                    'result' => $result['data'] ?? []
                 ]);
             }
 

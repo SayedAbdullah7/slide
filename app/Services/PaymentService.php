@@ -166,15 +166,14 @@ class PaymentService
 
         $result = $this->paymobService->createIntention($paymobData);
 
-        if ($result['success']) {
-            $result['data']['opportunity_id'] = $data['opportunity_id'];
-            $result['data']['shares'] = $data['shares'];
-            $result['data']['investment_type'] = $data['investment_type'];
-            $result['data']['amount_sar'] = $amountSar; // Base investment amount
-            $result['data']['total_payment_required'] = $totalPaymentRequired; // Total including fees
-            $result['data']['amount_to_pay'] = $totalPaymentRequired; // Amount actually being charged
-            $result['data']['share_price'] = $opportunity->share_price;
-            $result['data']['opportunity_name'] = $opportunity->name;
+        if ($result['success'] && isset($result['data'])) {
+            $publicKey = config('services.paymob.public_key');
+
+            // Return only the required fields
+            $result['data'] = [
+                'client_secret' => $result['data']['client_secret'] ?? null,
+                'public_key' => $publicKey,
+            ];
         }
 
 
@@ -218,21 +217,15 @@ class PaymentService
 
         $result = $this->paymobService->createIntention($paymobData);
 
-        if ($result['success']) {
-            $result['data']['amount_sar'] = $amountSar;
-            $result['data']['operation_type'] = 'wallet_charge';
+        if ($result['success'] && isset($result['data'])) {
+            $publicKey = config('services.paymob.public_key');
 
+            // Return only the required fields
+            $result['data'] = [
+                'client_secret' => $result['data']['client_secret'] ?? null,
+                'public_key' => $publicKey,
+            ];
         }
-        $responseData = [
-            'success' => $result['success'],
-            // 'message' => $result['message'],
-            'data' => [
-                'intention' => $result['intention'],
-                'public_key' => config('services.paymob.public_key'),
-            ]
-
-        ];
-        return $result;
 
         return $result;
     }
@@ -274,6 +267,35 @@ class PaymentService
             ->orderBy('last_used_at', 'desc')
             ->pluck('card_token')
             ->toArray();
+    }
+
+    /**
+     * Extract intention key from payment_keys based on pay_by
+     */
+    private function extractIntentionKey(array $data, string $payBy): ?string
+    {
+        $integrationIds = config('services.paymob.integration_id');
+        $targetIntegrationId = match($payBy) {
+            'apple_pay' => $integrationIds['apple_pay'] ?? null,
+            'card' => $integrationIds['card'] ?? null,
+            default => $integrationIds['card'] ?? null
+        };
+
+        if (!$targetIntegrationId || !isset($data['payment_keys']) || !is_array($data['payment_keys'])) {
+            return null;
+        }
+
+        // Convert to integer for comparison (config might be string, response is integer)
+        $targetIntegrationId = (int) $targetIntegrationId;
+
+        // Find the payment key that matches the target integration ID
+        foreach ($data['payment_keys'] as $paymentKey) {
+            if (isset($paymentKey['integration']) && (int) $paymentKey['integration'] === $targetIntegrationId) {
+                return $paymentKey['key'] ?? null;
+            }
+        }
+
+        return null;
     }
 }
 

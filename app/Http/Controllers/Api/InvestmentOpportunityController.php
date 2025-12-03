@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\InvestmentOpportunityResource;
+use App\Http\Resources\UserResource;
 use App\Http\Traits\Helpers\ApiResponseTrait;
 use App\Models\InvestmentOpportunity;
 use App\Models\PaymentLog;
@@ -51,9 +52,19 @@ class InvestmentOpportunityController extends Controller
         $types = explode(',', request()->query('type', '')); // Type of opportunities to fetch available|cameing|my|closed|wallet
 //        $types = explode(',', request()->query('type', 'available,coming,my,closed,wallet')); // Type of opportunities to fetch available|cameing|my|closed|wallet
         $params = request()->all();
-        $userId = Auth::check() ? Auth::id() : null;
+        $user = Auth::user();
+        $userId = $user ? $user->id : null;
 
-       $data = $this->service->getHomeData($types, $params, $userId);
+        $data = $this->service->getHomeData($types, $params, $userId);
+
+        // Add user data like login response
+        if ($user) {
+            $user->loadMissing('investorProfile', 'ownerProfile');
+            $data['user'] = new UserResource($user);
+            $data['active_profile_type'] = $user->active_profile_type;
+            $data['notifications_enabled'] = (bool) $user->notifications_enabled;
+            $data['has_password'] = $user->hasPassword();
+        }
 
         return $this->respondSuccessWithData('Investment opportunities retrieved successfully', $data);
     }
