@@ -1,0 +1,107 @@
+{
+	"info": {
+		"_postman_id": "bank-transfer-api-collection",
+		"name": "Bank Transfer API",
+		"description": "Complete API collection for bank transfer deposit functionality",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Get Company Bank Account",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/bank-transfer/company-account",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"bank-transfer",
+						"company-account"
+					]
+				},
+				"description": "Get company bank account details for deposit (NO AUTH REQUIRED - Public endpoint)"
+			},
+			"response": []
+		},
+		{
+			"name": "Submit Bank Transfer Request",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json"
+					},
+					{
+						"key": "Authorization",
+						"value": "Bearer {{investor_token}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "receipt",
+							"description": "Receipt file (JPG, PNG, or PDF - Max 5MB)",
+							"type": "file",
+							"src": []
+						}
+					]
+				},
+				"url": {
+					"raw": "{{base_url}}/bank-transfer/request",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"bank-transfer",
+						"request"
+					]
+				},
+				"description": "Submit bank transfer request with receipt upload (Auth required - Investor profile only)"
+			},
+			"response": []
+		},
+		{
+			"name": "Get Bank Transfer History",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{investor_token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/bank-transfer/history",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"bank-transfer",
+						"history"
+					]
+				},
+				"description": "Get bank transfer request history for authenticated user"
+			},
+			"response": []
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "https://slide.osta-app.com/api",
+			"type": "string"
+		},
+		{
+			"key": "investor_token",
+			"value": "",
+			"type": "string"
+		}
+	]
+}
+

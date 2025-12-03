@@ -1,0 +1,9 @@
+<x-app-layout>
+    <x-dynamic-table
+        table-id="{tableId}"
+        :columns="$columns"
+        :filters="$filters"
+        :actions="{actions}"
+        :create-url="route('{routePrefix}.create')"
+    />
+</x-app-layout>
