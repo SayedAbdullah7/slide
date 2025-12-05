@@ -64,6 +64,16 @@ class InvestmentOpportunityController extends Controller
             $data['active_profile_type'] = $user->active_profile_type;
             $data['notifications_enabled'] = (bool) $user->notifications_enabled;
             $data['has_password'] = $user->hasPassword();
+
+            // Add unread notifications count for investors only
+            if ($user->active_profile_type === \App\Models\User::PROFILE_INVESTOR) {
+                $data['unread_notifications_count'] = $user->unreadNotifications()->count();
+                //total notifications count
+                $data['total_notifications_count'] = $user->notifications()->count();
+            } else {
+                $data['unread_notifications_count'] = 0;
+                $data['total_notifications_count'] = 0;
+            }
         }
 
         return $this->respondSuccessWithData('Investment opportunities retrieved successfully', $data);

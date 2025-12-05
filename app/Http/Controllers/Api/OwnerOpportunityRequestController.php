@@ -300,6 +300,15 @@ class OwnerOpportunityRequestController extends Controller
             $dashboardData['active_profile_type'] = $user->active_profile_type;
             $dashboardData['notifications_enabled'] = (bool) $user->notifications_enabled;
             $dashboardData['has_password'] = $user->hasPassword();
+
+            // Add unread notifications count for owners only
+            if ($user->active_profile_type === \App\Models\User::PROFILE_OWNER) {
+                $dashboardData['unread_notifications_count'] = $user->unreadNotifications()->count();
+                $dashboardData['total_notifications_count'] = $user->notifications()->count();
+            } else {
+                $dashboardData['unread_notifications_count'] = 0;
+                $dashboardData['total_notifications_count'] = 0;
+            }
         }
 
         return $this->respondSuccessWithData('', $dashboardData);
