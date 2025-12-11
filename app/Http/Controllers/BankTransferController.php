@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\DataTables\Custom\BankTransferDataTable;
 use App\Models\BankTransferRequest;
 use App\Services\WalletService;
+use App\WalletDepositSourceEnum;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\View\View;
@@ -112,6 +113,7 @@ class BankTransferController extends Controller
                         $investor,
                         $validated['amount'],
                         [
+                            'source' => WalletDepositSourceEnum::BANK_TRANSFER,
                             'description' => 'Bank transfer deposit',
                             'bank_transfer_request_id' => $bankTransfer->id,
                             'transfer_reference' => $validated['transfer_reference'],

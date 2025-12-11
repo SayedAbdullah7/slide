@@ -153,6 +153,10 @@ class InvestmentService
         );
 
         return DB::transaction(function () use ($existingInvestment, $additionalShares, $additionalAmount, $additionalPaymentRequired, $opportunity, $skipWalletPayment) {
+            // Lock the opportunity for update to prevent race conditions
+            // قفل الفرصة للتحديث لمنع حالات التنافس
+            $opportunity = InvestmentOpportunity::lockForUpdate()->findOrFail($opportunity->id);
+
             // Process wallet payment for additional shares
             if (!$skipWalletPayment) {
                 $this->processWalletPayment($existingInvestment->investor, $additionalPaymentRequired, $opportunity);
@@ -200,6 +204,10 @@ class InvestmentService
         $totalPaymentRequired = $this->calculatorService->calculateTotalPaymentRequired($amount, $shares, $investmentType, $opportunity);
 
         return DB::transaction(function () use ($investor, $opportunity, $shares, $amount, $totalPaymentRequired, $investmentType, $skipWalletPayment) {
+            // Lock the opportunity for update to prevent race conditions
+            // قفل الفرصة للتحديث لمنع حالات التنافس
+            $opportunity = InvestmentOpportunity::lockForUpdate()->findOrFail($opportunity->id);
+
             // Process wallet payment
             if (!$skipWalletPayment) {
                 $this->processWalletPayment($investor, $totalPaymentRequired, $opportunity);

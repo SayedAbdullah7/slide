@@ -6,6 +6,7 @@ use App\DataTables\Custom\WithdrawalDataTable;
 use App\Models\WithdrawalRequest;
 // use App\Models\User;
 use App\Services\WalletService;
+use App\WalletDepositSourceEnum;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\View\View;
@@ -146,6 +147,7 @@ class WithdrawalController extends Controller
                         $investor,
                         $withdrawal->amount,
                         [
+                            'source' => WalletDepositSourceEnum::WITHDRAWAL_REFUND,
                             'description' => 'Withdrawal request rejected - refund',
                             'withdrawal_request_id' => $withdrawal->id,
                             'reference_number' => $withdrawal->reference_number,

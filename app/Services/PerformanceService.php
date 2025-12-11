@@ -11,6 +11,12 @@ use Carbon\Carbon;
 
 class PerformanceService
 {
+    protected $walletService;
+
+    public function __construct(WalletService $walletService)
+    {
+        $this->walletService = $walletService;
+    }
     /**
      * Get comprehensive statistics data for investor dashboard
      * الحصول على بيانات الإحصائيات الشاملة لوحة تحكم المستثمر
@@ -47,7 +53,8 @@ class PerformanceService
      */
     protected function getTotalBalance(InvestorProfile $investor): array
     {
-        $balance = $investor->getWalletBalance();
+        // Use WalletService to get balance consistently
+        $balance = $this->walletService->getWalletBalance($investor);
 
         return [
             'amount' => $balance,

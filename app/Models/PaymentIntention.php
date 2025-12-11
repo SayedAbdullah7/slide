@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\PaymentIntentionStatusEnum;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -45,6 +46,7 @@ class PaymentIntention extends Model
     ];
 
     protected $casts = [
+        'status' => PaymentIntentionStatusEnum::class,
         'is_executed' => 'boolean',
         'billing_data' => 'array',
         'items' => 'array',
@@ -76,7 +78,7 @@ class PaymentIntention extends Model
      */
     public function isActive(): bool
     {
-        return $this->status === 'active' && !$this->isExpired();
+        return $this->status === PaymentIntentionStatusEnum::ACTIVE && !$this->isExpired();
     }
 
     /**
@@ -92,7 +94,7 @@ class PaymentIntention extends Model
      */
     public function isSuccessful(): bool
     {
-        return $this->status === 'completed' && $this->is_executed;
+        return $this->status === PaymentIntentionStatusEnum::COMPLETED && $this->isExecuted();
     }
 
     /**
@@ -100,7 +102,15 @@ class PaymentIntention extends Model
      */
     public function isPending(): bool
     {
-        return in_array($this->status, ['created', 'active']);
+        return $this->status?->isPending() ?? false;
+    }
+
+    /**
+     * Check if transaction is executed
+     */
+    public function isExecuted(): bool
+    {
+        return $this->is_executed === true;
     }
 
     /**

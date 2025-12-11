@@ -96,38 +96,115 @@ class PaymentWebhookController extends Controller
 
 
     /**
-     * Validate HMAC signature from multiple sources
+     * Validate HMAC signature according to Paymob/Accept specification
+     *
+     * HMAC calculation steps:
+     * 1. Extract fields from obj in specific order
+     * 2. Concatenate values in that order
+     * 3. Calculate HMAC-SHA512 of the concatenated string
+     * 4. Compare with received HMAC
      */
     private function validateHmacSignature(Request $request, array $webhookData): bool
     {
-        return true;
         $hmacSecret = config('services.paymob.hmac_secret');
 
-        $hmacSignature = $request->header('X-Paymob-Signature')
-                      ?? $request->get('hmac')
+        // Get HMAC signature from query parameter (as per Paymob spec)
+        $hmacSignature = $request->get('hmac')
                       ?? $webhookData['hmac']
                       ?? null;
-        echo $hmacSignature;
-        echo '</br>';
-//        if (!$hmacSecret || !$hmacSignature) {
-//            return true; // Skip validation if not configured
-//        }
 
-        // Remove hmac from data before validation
-        $dataToValidate = $webhookData;
-        unset($dataToValidate['hmac']);
+        // Skip validation if HMAC secret is not configured
+        if (!$hmacSecret) {
+            PaymentLog::warning('HMAC secret not configured, skipping signature validation', [
+                'signature_provided' => !empty($hmacSignature)
+            ], null, null, null, 'paymob_hmac_not_configured');
+            return true; // Skip validation if not configured
+        }
 
-        $isValid = $this->paymobService->validateWebhookSignature(
-            $hmacSignature,
-            $dataToValidate
-        );
+        // Skip validation if no HMAC signature provided
+        if (!$hmacSignature) {
+            PaymentLog::warning('HMAC signature not provided in webhook', [
+                'type' => $webhookData['type'] ?? null
+            ], null, null, null, 'paymob_hmac_missing');
+            return true; // Allow request to continue (some webhooks might not have HMAC)
+        }
+
+        $type = $webhookData['type'] ?? null;
+        $obj = $webhookData['obj'] ?? [];
+
+        if (empty($obj)) {
+            return true; // Skip validation if obj is empty
+        }
+
+        // Build HMAC string according to Paymob specification
+        if ($type === 'TRANSACTION') {
+            // TRANSACTION webhook HMAC calculation
+            // Order: amount_cents, created_at, currency, error_occured, has_parent_transaction,
+            // obj.id, integration_id, is_3d_secure, is_auth, is_capture, is_refunded,
+            // is_standalone_payment, is_voided, order.id, owner, pending,
+            // source_data.pan, source_data.sub_type, source_data.type, success
+            $hmacString = '';
+            $hmacString .= $obj['amount_cents'] ?? '';
+            $hmacString .= $obj['created_at'] ?? '';
+            $hmacString .= $obj['currency'] ?? '';
+            $hmacString .= isset($obj['error_occured']) ? ($obj['error_occured'] ? 'true' : 'false') : '';
+            $hmacString .= isset($obj['has_parent_transaction']) ? ($obj['has_parent_transaction'] ? 'true' : 'false') : '';
+            $hmacString .= $obj['id'] ?? '';
+            $hmacString .= $obj['integration_id'] ?? '';
+            $hmacString .= isset($obj['is_3d_secure']) ? ($obj['is_3d_secure'] ? 'true' : 'false') : '';
+            $hmacString .= isset($obj['is_auth']) ? ($obj['is_auth'] ? 'true' : 'false') : '';
+            $hmacString .= isset($obj['is_capture']) ? ($obj['is_capture'] ? 'true' : 'false') : '';
+            $hmacString .= isset($obj['is_refunded']) ? ($obj['is_refunded'] ? 'true' : 'false') : '';
+            $hmacString .= isset($obj['is_standalone_payment']) ? ($obj['is_standalone_payment'] ? 'true' : 'false') : '';
+            $hmacString .= isset($obj['is_voided']) ? ($obj['is_voided'] ? 'true' : 'false') : '';
+            $hmacString .= $obj['order']['id'] ?? '';
+            $hmacString .= $obj['owner'] ?? '';
+            $hmacString .= isset($obj['pending']) ? ($obj['pending'] ? 'true' : 'false') : '';
+            $hmacString .= $obj['source_data']['pan'] ?? '';
+            $hmacString .= $obj['source_data']['sub_type'] ?? '';
+            $hmacString .= $obj['source_data']['type'] ?? '';
+            $hmacString .= isset($obj['success']) ? ($obj['success'] ? 'true' : 'false') : '';
+        } elseif ($type === 'TOKEN') {
+            // TOKEN webhook HMAC calculation
+            // Order: card_subtype, created_at, email, id, masked_pan, merchant_id, order_id, token
+            $hmacString = '';
+            $hmacString .= $obj['card_subtype'] ?? '';
+            $hmacString .= $obj['created_at'] ?? '';
+            $hmacString .= $obj['email'] ?? '';
+            $hmacString .= $obj['id'] ?? '';
+            $hmacString .= $obj['masked_pan'] ?? '';
+            $hmacString .= $obj['merchant_id'] ?? '';
+            $hmacString .= $obj['order_id'] ?? '';
+            $hmacString .= $obj['token'] ?? '';
+        } else {
+            // Unknown webhook type, skip validation
+            return true;
+        }
+
+        // Calculate HMAC using SHA512 (as per Paymob specification)
+        $calculatedHmac = hash_hmac('sha512', $hmacString, $hmacSecret);
+
+        // Compare signatures (time-safe comparison)
+        $isValid = hash_equals($calculatedHmac, $hmacSignature);
 
         if (!$isValid) {
             PaymentLog::error('Invalid HMAC signature', [
-                'signature_source' => $request->header('X-Paymob-Signature') ? 'header' : 'query/body',
+                'webhook_type' => $type,
+                'signature_source' => $request->get('hmac') ? 'query' : 'body',
                 'signature_preview' => substr($hmacSignature, 0, 20) . '...',
+                'calculated_preview' => substr($calculatedHmac, 0, 20) . '...',
+                'hmac_string_length' => strlen($hmacString),
+                'transaction_id' => $obj['id'] ?? null,
+                'token_id' => ($type === 'TOKEN') ? ($obj['id'] ?? null) : null,
                 'action' => 'Will reject request'
             ], null, null, null, 'paymob_webhook_invalid_signature');
+        } else {
+            PaymentLog::info('HMAC signature validated successfully', [
+                'webhook_type' => $type,
+                'transaction_id' => ($type === 'TRANSACTION') ? ($obj['id'] ?? null) : null,
+                'token_id' => ($type === 'TOKEN') ? ($obj['id'] ?? null) : null,
+                'signature_length' => strlen($hmacSignature)
+            ], null, null, null, 'paymob_webhook_signature_valid');
         }
 
         return $isValid;

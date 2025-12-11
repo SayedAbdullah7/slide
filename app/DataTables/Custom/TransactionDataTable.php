@@ -198,9 +198,10 @@ class TransactionDataTable extends BaseDataTable
 
             // Balance After Transaction
             ->addColumn('balance_after', function ($model) {
-                // Get wallet balance after this transaction
-                if ($model->payable && method_exists($model->payable, 'getWalletBalance')) {
-                    $balance = $model->payable->getWalletBalance();
+                // Get wallet balance after this transaction using WalletService
+                if ($model->payable) {
+                    $walletService = app(\App\Services\WalletService::class);
+                    $balance = $walletService->getWalletBalance($model->payable);
                     return '<span class="text-gray-800 fw-semibold">' . number_format($balance, 2) . ' SAR</span>';
                 }
                 return '<span class="text-muted">N/A</span>';

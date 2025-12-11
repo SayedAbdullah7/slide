@@ -19,6 +19,9 @@ class NotificationController extends Controller
     {
         $user = $request->user();
 
+        // Mark all unread notifications as read when fetching notifications
+        $user->unreadNotifications->markAsRead();
+
         $perPage = $request->input('per_page', 15);
         $page = $request->input('page', 1);
         $type = $request->input('type');

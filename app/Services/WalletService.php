@@ -3,12 +3,49 @@
 namespace App\Services;
 
 use App\Support\CurrentProfile;
+use App\WalletDepositSourceEnum;
 use Bavix\Wallet\Exceptions\AmountInvalid;
 use Bavix\Wallet\Exceptions\BalanceIsEmpty;
 use Bavix\Wallet\Exceptions\InsufficientFunds;
 use Illuminate\Support\Facades\DB;
 use Exception;
 
+/**
+ * WalletService - Centralized Wallet Operations Service
+ *
+ * ⚠️ CRITICAL RULE FOR ALL AI ASSISTANTS AND DEVELOPERS ⚠️
+ *
+ * ALL wallet operations MUST go through this service. DO NOT call wallet methods directly.
+ *
+ * ✅ CORRECT USAGE:
+ *   - Use WalletService::depositToWallet() instead of $wallet->deposit()
+ *   - Use WalletService::withdrawFromWallet() instead of $wallet->withdraw()
+ *   - Use WalletService::getWalletBalance() instead of $wallet->balance or $wallet->getWalletBalance()
+ *   - Use WalletService::getWalletTransactions() instead of $wallet->transactions()
+ *
+ * ❌ WRONG USAGE (DO NOT DO THIS):
+ *   - $wallet->deposit($amount) ❌
+ *   - $wallet->withdraw($amount) ❌
+ *   - $wallet->balance ❌
+ *   - $wallet->getWalletBalance() ❌
+ *   - $wallet->transactions() ❌
+ *
+ * REASON:
+ * This service provides:
+ * - Centralized transaction management (DB transactions)
+ * - Consistent error handling
+ * - Unified balance calculation logic
+ * - Easy maintenance (change once, affects everywhere)
+ * - Better testing and debugging
+ *
+ * ⚠️ IMPORTANT: depositToWallet() REQUIRES 'source' field in $meta array
+ * Use WalletDepositSourceEnum for type-safe source values
+ *
+ * If you need to modify wallet behavior, modify THIS service only.
+ * All changes will automatically apply to the entire codebase.
+ *
+ * @package App\Services
+ */
 class WalletService
 {
     protected $currentProfile;
@@ -49,10 +86,51 @@ class WalletService
     }
 
     /**
+     * Deposit amount to a specific wallet
      * إيداع مبلغ إلى محفظة محددة
+     *
+     * ⚠️ USE THIS METHOD instead of $wallet->deposit() directly
+     * This ensures proper transaction handling and error management.
+     *
+     * ⚠️ REQUIRED: 'source' field must be provided in $meta array
+     *
+     * Use WalletDepositSourceEnum for source values:
+     *   - WalletDepositSourceEnum::PAYMENT_GATEWAY: For deposits from payment gateways (Paymob, etc.)
+     *   - WalletDepositSourceEnum::DASHBOARD: For admin deposits from dashboard/admin operations
+     *   - WalletDepositSourceEnum::BANK_TRANSFER: For bank transfer deposits
+     *   - WalletDepositSourceEnum::WITHDRAWAL_REFUND: For refunds when withdrawal is rejected
+     *   - WalletDepositSourceEnum::PROFIT_DISTRIBUTION: For profit/returns distribution
+     *   - WalletDepositSourceEnum::API: For API deposits
+     *
+     * @param mixed $wallet The wallet instance (InvestorProfile or OwnerProfile)
+     * @param float $amount Amount to deposit
+     * @param array $meta Metadata for the transaction (MUST include 'source' field)
+     * @return bool True on success
+     * @throws Exception On failure or if 'source' is missing
      */
     public function depositToWallet($wallet, float $amount, array $meta = []): bool
     {
+        // Validate that 'source' is provided
+        if (!isset($meta['source']) || empty($meta['source'])) {
+            throw new Exception('Source field is required in meta for depositToWallet. Use WalletDepositSourceEnum values.');
+        }
+
+        // Handle Enum or string value - convert Enum to string value
+        $sourceValue = $meta['source'];
+        if ($sourceValue instanceof WalletDepositSourceEnum) {
+            $sourceValue = $sourceValue->value;
+        }
+
+        if (!WalletDepositSourceEnum::isValid($sourceValue)) {
+            throw new Exception('Invalid source value. Must be one of: ' . implode(', ', WalletDepositSourceEnum::values()));
+        }
+
+        // Validate required fields based on source type
+        $this->validateSourceSpecificFields($sourceValue, $meta);
+
+        // Ensure source is always set as string value
+        $meta['source'] = $sourceValue;
+
         try {
             DB::beginTransaction();
 
@@ -70,7 +148,70 @@ class WalletService
     }
 
     /**
+     * Validate required fields based on source type
+     * التحقق من الحقول المطلوبة بناءً على نوع المصدر
+     *
+     * @param string $source The source value
+     * @param array $meta The metadata array
+     * @throws Exception If required fields are missing
+     */
+    protected function validateSourceSpecificFields(string $source, array $meta): void
+    {
+        $sourceEnum = WalletDepositSourceEnum::from($source);
+
+        switch ($sourceEnum) {
+            case WalletDepositSourceEnum::DASHBOARD:
+                if (!isset($meta['admin_user_id']) || empty($meta['admin_user_id'])) {
+                    throw new Exception('admin_user_id is required when source is DASHBOARD');
+                }
+                break;
+
+            case WalletDepositSourceEnum::PAYMENT_GATEWAY:
+                if (!isset($meta['payment_id']) || empty($meta['payment_id'])) {
+                    throw new Exception('payment_id is required when source is PAYMENT_GATEWAY');
+                }
+                break;
+
+            case WalletDepositSourceEnum::BANK_TRANSFER:
+                if (!isset($meta['bank_transfer_request_id']) || empty($meta['bank_transfer_request_id'])) {
+                    throw new Exception('bank_transfer_request_id is required when source is BANK_TRANSFER');
+                }
+                break;
+
+            case WalletDepositSourceEnum::WITHDRAWAL_REFUND:
+                if (!isset($meta['withdrawal_request_id']) || empty($meta['withdrawal_request_id'])) {
+                    throw new Exception('withdrawal_request_id is required when source is WITHDRAWAL_REFUND');
+                }
+                break;
+
+            case WalletDepositSourceEnum::PROFIT_DISTRIBUTION:
+                if (!isset($meta['investment_id']) || empty($meta['investment_id'])) {
+                    throw new Exception('investment_id is required when source is PROFIT_DISTRIBUTION');
+                }
+                if (!isset($meta['distribution_id']) || empty($meta['distribution_id'])) {
+                    throw new Exception('distribution_id is required when source is PROFIT_DISTRIBUTION');
+                }
+                break;
+
+            case WalletDepositSourceEnum::API:
+                // API deposits might not require specific fields, but user_id is recommended
+                // No strict validation for API
+                break;
+        }
+    }
+
+    /**
+     * Withdraw amount from a specific wallet
      * سحب مبلغ من محفظة محددة
+     *
+     * ⚠️ USE THIS METHOD instead of $wallet->withdraw() directly
+     * This ensures proper transaction handling, balance validation, and error management.
+     *
+     * @param mixed $wallet The wallet instance (InvestorProfile or OwnerProfile)
+     * @param float $amount Amount to withdraw
+     * @param array $meta Metadata for the transaction
+     * @return bool True on success
+     * @throws Exception On failure (InsufficientFunds, BalanceIsEmpty, etc.)
      */
     public function withdrawFromWallet($wallet, float $amount, array $meta = []): bool
     {
@@ -146,9 +287,17 @@ class WalletService
     }
 
     /**
+     * Get balance of a specific wallet
      * الحصول على رصيد محفظة محددة
-     * Use this method consistently across all APIs to ensure the same balance value
-     * This method uses the same logic as InvestorProfile::getWalletBalance() for consistency
+     *
+     * ⚠️ USE THIS METHOD instead of $wallet->balance or $wallet->getWalletBalance() directly
+     * This ensures consistent balance calculation across the entire application.
+     *
+     * Use this method consistently across all APIs to ensure the same balance value.
+     * This method uses the same logic as InvestorProfile::getWalletBalance() for consistency.
+     *
+     * @param mixed $wallet The wallet instance (InvestorProfile or OwnerProfile)
+     * @return float Wallet balance (0.0 if wallet doesn't exist)
      */
     public function getWalletBalance($wallet): float
     {
@@ -169,7 +318,15 @@ class WalletService
     }
 
     /**
+     * Get transactions for a specific wallet
      * الحصول على معاملات محفظة محددة
+     *
+     * ⚠️ USE THIS METHOD instead of $wallet->transactions() directly
+     * This ensures consistent pagination and ordering.
+     *
+     * @param mixed $wallet The wallet instance (InvestorProfile or OwnerProfile)
+     * @param int $perPage Number of transactions per page
+     * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
      */
     public function getWalletTransactions($wallet, int $perPage = 15)
     {

@@ -8,6 +8,7 @@ use App\Http\Traits\Helpers\ApiResponseTrait;
 use App\Services\WalletService;
 use App\Services\WalletStatisticsService;
 use App\Support\CurrentProfile;
+use App\WalletDepositSourceEnum;
 use Bavix\Wallet\Exceptions\AmountInvalid;
 use Bavix\Wallet\Exceptions\BalanceIsEmpty;
 use Bavix\Wallet\Exceptions\InsufficientFunds;
@@ -89,6 +90,7 @@ class WalletController extends Controller
 
             // Prepare metadata
             $meta = [
+                'source' => WalletDepositSourceEnum::API,
                 'description' => $data['description'] ?? 'Wallet deposit',
                 'reference' => $data['reference'] ?? null,
                 'user_id' => $request->user()?->id,

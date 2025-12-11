@@ -2,6 +2,7 @@
 
 namespace App\DataTransferObjects;
 
+use App\Enums\PaymentIntentionStatusEnum;
 use App\Models\PaymentIntention;
 use App\Repositories\PaymentRepository;
 
@@ -177,12 +178,12 @@ class PaymobWebhookData
      * - pending → pending
      * - failed → failed
      */
-    public function getIntentionStatus(): string
+    public function getIntentionStatus(): PaymentIntentionStatusEnum
     {
         return match($this->getStatus()) {
-            'successful' => 'completed',
-            'pending' => 'pending',
-            default => 'failed'
+            'successful' => PaymentIntentionStatusEnum::COMPLETED,
+            'pending' => PaymentIntentionStatusEnum::ACTIVE,
+            default => PaymentIntentionStatusEnum::FAILED
         };
     }
 
@@ -434,6 +435,7 @@ class PaymobWebhookData
      */
     public function verify(?string $hmacSecret = null): array
     {
+        $saveResponse = true; // todo complete logic for save response
         $errors = [];
         $warnings = [];
 
@@ -545,6 +547,7 @@ class PaymobWebhookData
         // }
 
         return [
+            'save_response' => $saveResponse,
             'valid' => empty($errors),
             'errors' => $errors,
             'warnings' => $warnings,

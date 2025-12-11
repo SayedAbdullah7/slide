@@ -542,7 +542,7 @@ class InvestmentOpportunity extends Model implements HasMedia
             return 0;
         }
 
-        return round(($this->shipping_fee_per_share / $this->share_price) * 100, 2);
+        return round(($this->shipping_fee_per_share / $this->share_price) * 100, 3);
     }
 
     // ---------------------------------------------

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Transaction;
+use App\Services\WalletService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\View\View;
@@ -10,6 +11,12 @@ use App\DataTables\Custom\TransactionDataTable;
 
 class TransactionController extends Controller
 {
+    protected $walletService;
+
+    public function __construct(WalletService $walletService)
+    {
+        $this->walletService = $walletService;
+    }
     /**
      * Display a listing of the resource.
      */
@@ -36,8 +43,8 @@ class TransactionController extends Controller
             if ($user) {
                 $hasInvestor = $user->investorProfile !== null;
                 $hasOwner = $user->ownerProfile !== null;
-                $investorBalance = $hasInvestor ? $user->investorProfile->getWalletBalance() : 0;
-                $ownerBalance = $hasOwner ? $user->ownerProfile->getWalletBalance() : 0;
+                $investorBalance = $hasInvestor ? $this->walletService->getWalletBalance($user->investorProfile) : 0;
+                $ownerBalance = $hasOwner ? $this->walletService->getWalletBalance($user->ownerProfile) : 0;
             }
         }
 

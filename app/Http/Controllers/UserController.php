@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\DataTables\Custom\UserDataTable;
 use App\Models\User;
+use App\Services\WalletService;
+use App\WalletDepositSourceEnum;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\View\View;
@@ -12,6 +14,12 @@ use Illuminate\Support\Facades\Auth;
 
 class UserController extends Controller
 {
+    protected $walletService;
+
+    public function __construct(WalletService $walletService)
+    {
+        $this->walletService = $walletService;
+    }
     /**
      * Display a listing of the resource.
      */
@@ -289,8 +297,8 @@ class UserController extends Controller
         $user->load(['investorProfile', 'ownerProfile']);
         $hasInvestor = $user->investorProfile !== null;
         $hasOwner = $user->ownerProfile !== null;
-        $investorBalance = $hasInvestor ? $user->investorProfile->getWalletBalance() : 0;
-        $ownerBalance = $hasOwner ? $user->ownerProfile->getWalletBalance() : 0;
+        $investorBalance = $hasInvestor ? $this->walletService->getWalletBalance($user->investorProfile) : 0;
+        $ownerBalance = $hasOwner ? $this->walletService->getWalletBalance($user->ownerProfile) : 0;
 
         return view('pages.user.forms.wallet-operation', compact(
             'user', 'hasInvestor', 'hasOwner', 'investorBalance', 'ownerBalance'
@@ -305,8 +313,8 @@ class UserController extends Controller
         $user->load(['investorProfile', 'ownerProfile']);
         $hasInvestor = $user->investorProfile !== null;
         $hasOwner = $user->ownerProfile !== null;
-        $investorBalance = $hasInvestor ? $user->investorProfile->getWalletBalance() : 0;
-        $ownerBalance = $hasOwner ? $user->ownerProfile->getWalletBalance() : 0;
+        $investorBalance = $hasInvestor ? $this->walletService->getWalletBalance($user->investorProfile) : 0;
+        $ownerBalance = $hasOwner ? $this->walletService->getWalletBalance($user->ownerProfile) : 0;
 
         return view('pages.user.forms.wallet-operation', compact(
             'user', 'hasInvestor', 'hasOwner', 'investorBalance', 'ownerBalance'
@@ -349,14 +357,15 @@ class UserController extends Controller
                 $wallet = $user->ownerProfile;
             }
 
-            // Deposit to wallet
-            $wallet->deposit($validated['amount'], [
+            // Deposit to wallet using WalletService
+            $this->walletService->depositToWallet($wallet, $validated['amount'], [
+                'source' => WalletDepositSourceEnum::DASHBOARD,
                 'description' => $validated['description'] ?? 'Admin deposit',
                 'admin_user_id' => Auth::id(),
                 'transaction_date' => now()->toDateTimeString()
             ]);
 
-            $newBalance = $wallet->getWalletBalance();
+            $newBalance = $this->walletService->getWalletBalance($wallet);
 
             return response()->json([
                 'status' => true,
@@ -403,8 +412,8 @@ class UserController extends Controller
                 $wallet = $user->ownerProfile;
             }
 
-            // Check if wallet has sufficient balance
-            $currentBalance = $wallet->getWalletBalance();
+            // Check if wallet has sufficient balance using WalletService
+            $currentBalance = $this->walletService->getWalletBalance($wallet);
             if ($currentBalance < $validated['amount']) {
                 return response()->json([
                     'status' => false,
@@ -412,14 +421,14 @@ class UserController extends Controller
                 ], 400);
             }
 
-            // Withdraw from wallet
-            $wallet->withdraw($validated['amount'], [
+            // Withdraw from wallet using WalletService
+            $this->walletService->withdrawFromWallet($wallet, $validated['amount'], [
                 'description' => $validated['description'] ?? 'Admin withdrawal',
                 'admin_user_id' => Auth::id(),
                 'transaction_date' => now()->toDateTimeString()
             ]);
 
-            $newBalance = $wallet->getWalletBalance();
+            $newBalance = $this->walletService->getWalletBalance($wallet);
 
             return response()->json([
                 'status' => true,

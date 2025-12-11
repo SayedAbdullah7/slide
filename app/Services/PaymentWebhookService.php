@@ -3,17 +3,25 @@
 namespace App\Services;
 
 use App\DataTransferObjects\PaymobWebhookData;
+use App\Enums\PaymentIntentionStatusEnum;
 use App\Models\PaymentLog;
 use App\Models\User;
 use App\Models\InvestmentOpportunity;
 use App\Repositories\PaymentRepository;
+use App\WalletDepositSourceEnum;
+use Illuminate\Support\Facades\DB;
 use Exception;
 
 class PaymentWebhookService
 {
+    protected $walletService;
+
     public function __construct(
-        private PaymentRepository $paymentRepository
-    ) {}
+        private PaymentRepository $paymentRepository,
+        WalletService $walletService
+    ) {
+        $this->walletService = $walletService;
+    }
 
     // // Extract transaction details
     // $transactionId = $obj['id'] ?? null; /// this is transaction id in paymob and i dont recive it in intention request
@@ -47,6 +55,13 @@ class PaymentWebhookService
                     'transaction_id' => $webhook->getTransactionId(),
                     'order_id' => $webhook->getOrderId()
                 ], null, null, null, 'webhook_verification_failed');
+
+                $saveResponse = $verification['save_response'] ?? true;
+
+                // Save paymob_response even if verification failed (if saveResponse is true)
+                if ($saveResponse) {
+                    $this->saveResponseEvenIfFailed($webhook);
+                }
 
                 return [
                     'success' => false,
@@ -106,6 +121,27 @@ class PaymentWebhookService
 
 
     /**
+     * Save paymob_response even if verification failed
+     * Uses same logic as updateIntentionWithTransaction but without executing transaction
+     * Only saves if is_executed is false and no previous successful status exists
+     */
+    private function saveResponseEvenIfFailed(PaymobWebhookData $webhook): void
+    {
+        $intention = $webhook->getPaymentIntention();
+
+        if ($intention && !$intention->isExecuted() && $intention->status !== PaymentIntentionStatusEnum::COMPLETED) {
+            $this->paymentRepository->updateIntention($intention, [
+                'status' => $webhook->getIntentionStatus(),
+                'transaction_id' => $webhook->getTransactionId(),
+                'merchant_order_id' => $webhook->getMerchantOrderId(),
+                'payment_method' => $webhook->getPaymentMethod(),
+                'paymob_response' => $webhook->getRawData(),
+                'processed_at' => now(),
+            ]);
+        }
+    }
+
+    /**
      * Update intention with transaction data
      */
     private function updateIntentionWithTransaction($intention, PaymobWebhookData $webhook): void
@@ -121,7 +157,7 @@ class PaymentWebhookService
         ]);
 
         // Execute transaction ONLY if successful AND not already executed
-        if ($webhook->isSuccessful() && !$intention->is_executed) {
+        if ($webhook->isSuccessful() && !$intention->isExecuted()) {
             $this->executeTransaction($intention);
 
             PaymentLog::info('Payment completed and executed', [
@@ -168,19 +204,21 @@ class PaymentWebhookService
             }
 
             // Use existing depositToWallet method from WalletService
-            $walletService = app(WalletService::class);
-            $walletService->depositToWallet($wallet, $amountSar, [
+            $this->walletService->depositToWallet($wallet, $amountSar, [
+                'source' => WalletDepositSourceEnum::PAYMENT_GATEWAY,
                 'type' => 'payment_gateway',
-                'source' => 'paymob',
                 'payment_id' => $intention->id,
                 // 'transaction_id' => $intention->transaction_id,
                 'description' => 'Wallet charge from payment gateway'
             ]);
 
+            // Get balance using WalletService
+            $newBalance = $this->walletService->getWalletBalance($wallet);
+
             // Send notification
             $user->notify(new \App\Notifications\WalletRechargedNotification(
                 $amountSar,
-                $wallet->fresh()->balance,
+                $newBalance,
                 'payment_gateway'
             ));
 
@@ -193,7 +231,7 @@ class PaymentWebhookService
                 'user_id' => $user->id,
                 'amount_sar' => $amountSar,
                 'wallet_type' => $wallet instanceof \App\Models\InvestorProfile ? 'investor' : 'owner',
-                'new_balance' => $wallet->fresh()->balance
+                'new_balance' => $newBalance
             ], $user->id, $intention->id, null, 'wallet_charged');
 
         } catch (Exception $e) {
@@ -207,14 +245,46 @@ class PaymentWebhookService
 
     /**
      * Execute investment transaction
+     * تنفيذ استثمار: شحن الرصيد في المحفظة أولاً ثم سحبه لشراء الفرصة
+     *
+     * ⚠️ IMPORTANT FOR AI ASSISTANTS AND DEVELOPERS ⚠️
+     *
+     * This method MUST use TWO SEPARATE database transactions:
+     *
+     * 1. FIRST TRANSACTION: Wallet deposit + Intention update
+     *    - Deposit the payment amount to investor's wallet
+     *    - Mark the intention as executed (is_executed = true)
+     *    - If this succeeds, the money is in the wallet and intention is marked as executed
+     *    - This transaction MUST be committed independently
+     *
+     * 2. SECOND TRANSACTION: Investment execution
+     *    - Execute the investment using InvestmentService::invest()
+     *    - This will withdraw from wallet and purchase shares
+     *    - This transaction is separate and independent
+     *
+     * WHY THIS DESIGN?
+     * - If investment fails (e.g., shares sold out), the money remains in the wallet
+     * - The intention is already marked as executed, so we know payment was received
+     * - The wallet balance can be refunded or used for other purposes
+     * - This prevents rollback of the wallet deposit if investment fails
+     *
+     * DO NOT combine these into a single transaction!
+     * DO NOT rollback the first transaction if the second fails!
+     *
+     * العملية منفصلة إلى خطوتين:
+     * 1. شحن الرصيد + تحديث Intention (transaction منفصلة)
+     * 2. الاستثمار (سحب الرصيد وشراء الأسهم) - transaction منفصلة
+     *
+     * إذا فشل الاستثمار (مثلاً الأسهم خلصت)، الرصيد يبقى في المحفظة
      */
     private function executeInvestment($intention): void
     {
-        try {
-            $extras = $intention->extras ?? [];
-            $opportunityId = $extras['opportunity_id'] ?? null;
-            $shares = $extras['shares'] ?? null;
+        $extras = $intention->extras ?? [];
+        $opportunityId = $extras['opportunity_id'] ?? null;
+        $shares = $extras['shares'] ?? null;
+        $amountSar = $intention->amount_cents / 100;
 
+        try {
             if (!$opportunityId || !$shares) {
                 PaymentLog::error('Missing investment data', [
                     'extras' => $extras,
@@ -222,19 +292,6 @@ class PaymentWebhookService
                 ], $intention->user_id, $intention->id, null, 'investment_missing_data');
                 return;
             }
-
-            $opportunity = InvestmentOpportunity::find($opportunityId);
-
-            if (!$opportunity) {
-                PaymentLog::error('Investment opportunity not found', [
-                    'opportunity_id' => $opportunityId,
-                    'payment_id' => $intention->id
-                ], $intention->user_id, $intention->id, null, 'investment_opportunity_not_found');
-                return;
-            }
-
-            // Use existing invest method from InvestmentService
-            $investmentService = app(InvestmentService::class);
 
             // Get investor profile
             $investor = \App\Models\InvestorProfile::where('user_id', $intention->user_id)->first();
@@ -247,26 +304,83 @@ class PaymentWebhookService
                 return;
             }
 
-            // Create investment (skip wallet payment since payment was already processed via Paymob)
-            $investment = $investmentService->invest(
-                investor: $investor,
-                opportunity: $opportunity,
-                shares: $shares,
-                investmentType: $extras['investment_type'] ?? 'myself',
-                skipWalletPayment: true // Online payment already processed, don't deduct from wallet
-            );
+            // Get opportunity
+            $opportunity = InvestmentOpportunity::findOrFail($opportunityId);
+            $opportunityName = $opportunity->name ?? "الفرصة رقم {$opportunityId}";
 
-            // Mark as executed
-            $this->paymentRepository->updateIntention($intention, [
-                'is_executed' => true
-            ]);
+            // Step 1: شحن الرصيد في المحفظة + تحديث Intention
+            // هذه خطوة منفصلة - إذا نجحت، الرصيد موجود والـ intention محدث
+            DB::transaction(function () use ($intention, $opportunityId, $shares, $amountSar, $investor, $opportunityName) {
+                // شحن الرصيد في المحفظة
+                $this->walletService->depositToWallet($investor, $amountSar, [
+                    'source' => WalletDepositSourceEnum::PAYMENT_GATEWAY,
+                    'payment_id' => $intention->id,
+                    'opportunity_id' => $opportunityId,
+                    'shares' => $shares,
+                    'description' => "شحن رصيد من بوابة الدفع لشراء فرصة: {$opportunityName}",
+                ]);
+
+                // تحديث Intention - العملية تم تنفيذها (الرصيد تم شحنه)
+                $this->paymentRepository->updateIntention($intention, [
+                    'is_executed' => true
+                ]);
+
+                // Get balance using WalletService
+                $newBalance = $this->walletService->getWalletBalance($investor);
+
+                PaymentLog::info('Wallet credited for investment', [
+                    'user_id' => $intention->user_id,
+                    'amount_sar' => $amountSar,
+                    'opportunity_id' => $opportunityId,
+                    'payment_id' => $intention->id,
+                    'new_balance' => $newBalance
+                ], $intention->user_id, $intention->id, null, 'wallet_credited_for_investment');
+            });
+
+            // Step 2: الاستثمار (سحب الرصيد وشراء الأسهم)
+            // هذه خطوة منفصلة - إذا فشلت (مثلاً الأسهم خلصت)، الرصيد يبقى في المحفظة
+            try {
+                $investmentService = app(InvestmentService::class);
+                $investment = $investmentService->invest(
+                    investor: $investor,
+                    opportunity: $opportunity,
+                    shares: $shares,
+                    investmentType: $extras['investment_type'] ?? 'myself',
+                    skipWalletPayment: false // سحب من المحفظة (التي تم شحنها للتو)
+                );
+
+                PaymentLog::info('Investment executed successfully via wallet', [
+                    'investment_id' => $investment->id,
+                    'user_id' => $intention->user_id,
+                    'opportunity_id' => $opportunityId,
+                    'shares' => $shares,
+                    'amount_sar' => $amountSar,
+                    'payment_id' => $intention->id
+                ], $intention->user_id, $intention->id, null, 'investment_executed_via_wallet');
+
+            } catch (Exception $investmentException) {
+                // في حالة فشل الاستثمار (مثلاً الأسهم خلصت)، الرصيد موجود في المحفظة
+                // لا نحتاج لإرجاع المال لأن الرصيد موجود في المحفظة بالفعل
+                PaymentLog::error('Investment failed after wallet deposit', [
+                    'opportunity_id' => $opportunityId,
+                    'shares' => $shares,
+                    'amount_sar' => $amountSar,
+                    'exception' => PaymentLog::formatException($investmentException, 3000),
+                    'note' => 'الرصيد موجود في المحفظة ويمكن استرجاعه'
+                ], $intention->user_id, $intention->id, null, 'investment_failed_after_deposit');
+
+                // إعادة رمي الاستثناء للتعامل معه في catch الخارجي
+                throw $investmentException;
+            }
 
         } catch (Exception $e) {
-            PaymentLog::error('Investment failed', [
-                'opportunity_id' => $extras['opportunity_id'] ?? null,
-                'shares' => $extras['shares'] ?? null,
+            PaymentLog::error('Investment execution failed', [
+                'opportunity_id' => $opportunityId,
+                'shares' => $shares,
+                'amount_sar' => $amountSar,
                 'exception' => PaymentLog::formatException($e, 3000)
-            ], $intention->user_id, $intention->id, null, 'investment_failed');
+            ], $intention->user_id, $intention->id, null, 'investment_execution_failed');
+
             throw $e;
         }
     }

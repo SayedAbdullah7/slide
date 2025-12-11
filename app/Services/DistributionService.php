@@ -6,6 +6,7 @@ use App\Models\Investment;
 use App\Models\InvestmentOpportunity;
 use App\Models\InvestorProfile;
 use App\Models\InvestmentDistribution;
+use App\WalletDepositSourceEnum;
 use Illuminate\Support\Facades\DB;
 use Exception;
 
@@ -82,6 +83,7 @@ class DistributionService
                 $investment->investor,
                 $amount,
                 [
+                    'source' => WalletDepositSourceEnum::PROFIT_DISTRIBUTION,
                     'type' => 'returns_distribution',
                     'investment_id' => $investment->id,
                     'distribution_id' => $distribution->id,

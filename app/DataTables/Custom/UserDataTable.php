@@ -150,10 +150,11 @@ class UserDataTable extends BaseDataTable
 
             // Wallet Balance Column with Link to Transactions
             ->addColumn('wallet_balance', function ($model) {
+                $walletService = app(\App\Services\WalletService::class);
                 $hasInvestor = $model->investorProfile !== null;
                 $hasOwner = $model->ownerProfile !== null;
-                $investorBalance = $hasInvestor ? $model->investorProfile->getWalletBalance() : 0;
-                $ownerBalance = $hasOwner ? $model->ownerProfile->getWalletBalance() : 0;
+                $investorBalance = $hasInvestor ? $walletService->getWalletBalance($model->investorProfile) : 0;
+                $ownerBalance = $hasOwner ? $walletService->getWalletBalance($model->ownerProfile) : 0;
                 $totalBalance = $investorBalance + $ownerBalance;
 
                 // Get transaction count for this user
