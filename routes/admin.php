@@ -120,6 +120,12 @@ Route::prefix('admin')->name('admin.')->middleware(['auth'])->group(function () 
     Route::get('investments/opportunity/{opportunity_id}', [InvestmentController::class, 'index'])
         ->name('investments.by-opportunity');
 
+    // Filter investments by investor
+    // Use query parameter instead: /admin/investments?investor_id=123
+    // Or access via: /admin/investments/investor/{investor_id}
+    Route::get('investments/investor/{investor_id}', [InvestmentController::class, 'index'])
+        ->name('investments.by-investor');
+
     // Investment - Admin Actions
     Route::prefix('investments')->name('investments.')->group(function () {
         // Mark merchandise as arrived (for Myself type investments)

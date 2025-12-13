@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreInvestmentRequest;
+use App\Http\Requests\UpdateInvestmentRequest;
 use App\Models\Investment;
 use App\Models\InvestmentOpportunity;
 use App\Models\InvestorProfile;
@@ -15,29 +17,49 @@ class InvestmentController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index(InvestmentDataTable $dataTable, Request $request, $opportunityId = null): JsonResponse|View
+    public function index(InvestmentDataTable $dataTable, Request $request, $opportunityId = null, $investorId = null): JsonResponse|View
     {
-        // Support multiple ways to pass opportunity_id:
-        // 1. Route parameter: /admin/investments/opportunity/{id}
-        // 2. Query parameter: /admin/investments?opportunity_id={id}
-        if (!$opportunityId) {
-            $opportunityId = $request->get('opportunity_id');
+        // Get route name to determine which parameter to use
+        $routeName = $request->route()->getName();
+
+        // Get parameters based on route name
+        if ($routeName === 'admin.investments.by-investor') {
+            // Route: /admin/investments/investor/{investor_id}
+            $investorId = $request->route('investor_id') ?? $opportunityId; // Fallback if bound to wrong param
+            $opportunityId = null;
+        } elseif ($routeName === 'admin.investments.by-opportunity') {
+            // Route: /admin/investments/opportunity/{opportunity_id}
+            $opportunityId = $request->route('opportunity_id') ?? $opportunityId;
+            $investorId = null;
+        } else {
+            // Regular index route - get from route params or query string
+            $investorId = $request->route('investor_id') ?? $request->get('investor_id') ?? $investorId;
+            $opportunityId = $request->route('opportunity_id') ?? $request->get('opportunity_id') ?? $opportunityId;
         }
 
         if ($request->ajax()) {
-            return $dataTable->handle($opportunityId);
+            return $dataTable->handle($opportunityId, $investorId);
         }
 
         $opportunity = null;
+        $investor = null;
 
         if ($opportunityId) {
             $opportunity = InvestmentOpportunity::find($opportunityId);
         }
 
-        // Generate proper AJAX URL based on whether we're filtering by opportunity
-        $ajaxUrl = $opportunityId
-            ? route('admin.investments.index', ['opportunity_id' => $opportunityId])
-            : route('admin.investments.index');
+        if ($investorId) {
+            $investor = InvestorProfile::with('user')->find($investorId);
+        }
+
+        // Generate proper AJAX URL based on whether we're filtering by opportunity or investor
+        if ($opportunityId) {
+            $ajaxUrl = route('admin.investments.index', ['opportunity_id' => $opportunityId]);
+        } elseif ($investorId) {
+            $ajaxUrl = route('admin.investments.index', ['investor_id' => $investorId]);
+        } else {
+            $ajaxUrl = route('admin.investments.index');
+        }
 
         return view('pages.investment.index', [
             'columns' => collect($dataTable->columns())->map(function ($column) {
@@ -48,6 +70,8 @@ class InvestmentController extends Controller
             'ajaxUrl' => $ajaxUrl,
             'opportunityId' => $opportunityId,
             'opportunity' => $opportunity,
+            'investorId' => $investorId,
+            'investor' => $investor,
         ]);
     }
 
@@ -71,30 +95,23 @@ class InvestmentController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request): JsonResponse
+    public function store(StoreInvestmentRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'opportunity_id' => 'required|exists:investment_opportunities,id',
-            'investor_id' => 'required|exists:investor_profiles,id',
-            'investment_type' => 'required|in:myself,authorize',
-            'status' => 'required|in:pending,active,completed,cancelled',
-            'shares' => 'required|integer|min:1',
-            'share_price' => 'required|numeric|min:0',
-            'investment_date' => 'required|date',
-            'shipping_fee_per_share' => 'nullable|numeric|min:0',
-            'expected_profit_per_share' => 'nullable|numeric|min:0',
-            'expected_net_profit_per_share' => 'nullable|numeric|min:0',
-            'merchandise_status' => 'nullable|in:pending,arrived',
-            'expected_delivery_date' => 'nullable|date',
-            'expected_distribution_date' => 'nullable|date',
-            'merchandise_arrived_at' => 'nullable|date',
-            'actual_profit_per_share' => 'nullable|numeric|min:0',
-            'actual_net_profit_per_share' => 'nullable|numeric|min:0',
-            'actual_returns_recorded_at' => 'nullable|date',
-            'distribution_status' => 'nullable|in:pending,distributed',
-            'distributed_profit' => 'nullable|numeric|min:0',
-            'distributed_at' => 'nullable|date',
-        ]);
+        $validated = $request->validated();
+
+        // Get opportunity to copy additional data
+        $opportunity = InvestmentOpportunity::findOrFail($validated['opportunity_id']);
+
+        // Add data from opportunity
+        $validated['share_price'] = $opportunity->share_price;
+        $validated['shipping_fee_per_share'] = $opportunity->shipping_fee_per_share ?? 0;
+        $validated['expected_profit_per_share'] = $opportunity->expected_profit ?? 0;
+        $validated['expected_net_profit_per_share'] = $opportunity->expected_net_profit ?? 0;
+        $validated['status'] = 'active';
+        $validated['investment_date'] = now();
+        $validated['merchandise_status'] = 'pending';
+        $validated['distribution_status'] = 'pending';
+        $validated['user_id'] = \App\Models\InvestorProfile::findOrFail($validated['investor_id'])->user_id;
 
         // Calculate total investment
         $validated['total_investment'] = $validated['shares'] * $validated['share_price'];
@@ -103,8 +120,18 @@ class InvestmentController extends Controller
         if ($validated['investment_type'] === 'myself') {
             $validated['total_payment_required'] = $validated['total_investment'] +
                 ($validated['shipping_fee_per_share'] ?? 0) * $validated['shares'];
+
+            // Set expected delivery date
+            if ($opportunity->investment_duration) {
+                $validated['expected_delivery_date'] = now()->addDays($opportunity->investment_duration);
+            }
         } else {
             $validated['total_payment_required'] = $validated['total_investment'];
+
+            // Set expected distribution date
+            if ($opportunity->expected_distribution_date) {
+                $validated['expected_distribution_date'] = $opportunity->expected_distribution_date;
+            }
         }
 
         $investment = Investment::create($validated);
@@ -146,40 +173,21 @@ class InvestmentController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, Investment $investment): JsonResponse
+    public function update(UpdateInvestmentRequest $request, Investment $investment): JsonResponse
     {
-        $validated = $request->validate([
-            'opportunity_id' => 'required|exists:investment_opportunities,id',
-            'investor_id' => 'required|exists:investor_profiles,id',
-            'investment_type' => 'required|in:myself,authorize',
-            'status' => 'required|in:pending,active,completed,cancelled',
-            'shares' => 'required|integer|min:1',
-            'share_price' => 'required|numeric|min:0',
-            'investment_date' => 'required|date',
-            'shipping_fee_per_share' => 'nullable|numeric|min:0',
-            'expected_profit_per_share' => 'nullable|numeric|min:0',
-            'expected_net_profit_per_share' => 'nullable|numeric|min:0',
-            'merchandise_status' => 'nullable|in:pending,arrived',
-            'expected_delivery_date' => 'nullable|date',
-            'expected_distribution_date' => 'nullable|date',
-            'merchandise_arrived_at' => 'nullable|date',
-            'actual_profit_per_share' => 'nullable|numeric|min:0',
-            'actual_net_profit_per_share' => 'nullable|numeric|min:0',
-            'actual_returns_recorded_at' => 'nullable|date',
-            'distribution_status' => 'nullable|in:pending,distributed',
-            'distributed_profit' => 'nullable|numeric|min:0',
-            'distributed_at' => 'nullable|date',
-        ]);
+        $validated = $request->validated();
 
-        // Calculate total investment
-        $validated['total_investment'] = $validated['shares'] * $validated['share_price'];
+        // Recalculate totals if shares changed
+        if (isset($validated['shares'])) {
+            $validated['total_investment'] = $validated['shares'] * $investment->share_price;
 
-        // Calculate total payment required
-        if ($validated['investment_type'] === 'myself') {
-            $validated['total_payment_required'] = $validated['total_investment'] +
-                ($validated['shipping_fee_per_share'] ?? 0) * $validated['shares'];
-        } else {
-            $validated['total_payment_required'] = $validated['total_investment'];
+            // Recalculate total payment required
+            if ($investment->investment_type === 'myself') {
+                $validated['total_payment_required'] = $validated['total_investment'] +
+                    ($investment->shipping_fee_per_share ?? 0) * $validated['shares'];
+            } else {
+                $validated['total_payment_required'] = $validated['total_investment'];
+            }
         }
 
         $investment->update($validated);

@@ -51,8 +51,14 @@ class InvestmentDataTable extends BaseDataTable
      */
     public function filters(): array
     {
+        $investors = \App\Models\InvestorProfile::with('user')->get()->mapWithKeys(function ($investor) {
+            $name = $investor->user->display_name ?? $investor->full_name ?? 'Investor #' . $investor->id;
+            return [$investor->id => $name];
+        })->toArray();
+
         return [
             'opportunity_id' => Filter::select('Opportunity', \App\Models\InvestmentOpportunity::pluck('name', 'id')->toArray()),
+            'investor_id' => Filter::select('Investor', $investors),
             'status' => Filter::select('Status', [
                 'pending' => 'Pending',
                 'active' => 'Active',
@@ -81,13 +87,18 @@ class InvestmentDataTable extends BaseDataTable
      *
      * @return \Illuminate\Http\JsonResponse
      */
-    public function handle($opportunityId = null)
+    public function handle($opportunityId = null, $investorId = null)
     {
         $query = Investment::with(['opportunity', 'investorProfile.user']);
 
         // Filter by opportunity ID if provided
         if ($opportunityId) {
             $query->where('opportunity_id', $opportunityId);
+        }
+
+        // Filter by investor ID if provided
+        if ($investorId) {
+            $query->where('investor_id', $investorId);
         }
 
         return DataTables::of($query)
@@ -210,8 +221,17 @@ class InvestmentDataTable extends BaseDataTable
                     $query->where('opportunity_id', $opportunityId);
                 }
 
+                // Filter by investor_id if provided in URL
+                $investorId = request()->get('investor_id');
+                if ($investorId) {
+                    $query->where('investor_id', $investorId);
+                }
+
                 if (!empty($filters['opportunity_id'])) {
                     $query->where('opportunity_id', $filters['opportunity_id']);
+                }
+                if (!empty($filters['investor_id'])) {
+                    $query->where('investor_id', $filters['investor_id']);
                 }
                 if (!empty($filters['status'])) {
                     $query->where('status', $filters['status']);

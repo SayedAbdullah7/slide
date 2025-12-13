@@ -28,6 +28,16 @@
         <i class="ki-outline ki-pencil fs-4"></i>
     </a>
 
+    <!-- Quick View Investments Button (only if user has investor profile with investments) -->
+    @if($hasInvestor && $totalInvestments > 0)
+    <a href="{{ route('admin.investments.by-investor', $model->investorProfile->id) }}"
+       class="btn btn-icon btn-light-info btn-sm"
+       data-bs-toggle="tooltip"
+       title="View investments ({{ $totalInvestments }})">
+        <i class="ki-outline ki-chart-line-up fs-4"></i>
+    </a>
+    @endif
+
     <!-- Actions Dropdown -->
     <div class="dropdown">
         <button class="btn btn-icon btn-light btn-sm"
@@ -208,7 +218,7 @@
                 </li>
 
                 <li>
-                    <a class="dropdown-item" href="{{ route('admin.investments.index', ['user_id' => $model->id]) }}">
+                    <a class="dropdown-item" href="{{ route('admin.investments.by-investor', $model->investorProfile->id) }}">
                         <i class="ki-outline ki-chart-line-up fs-5 me-2 text-primary"></i>
                         View Investments
                         <span class="badge badge-light-primary badge-sm ms-1">{{ $totalInvestments }}</span>
