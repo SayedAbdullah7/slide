@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -32,6 +33,8 @@ use Illuminate\Database\Eloquent\Model;
  */
 class Investment extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'investor_profile_id',
         'investment_date',
@@ -88,6 +91,46 @@ class Investment extends Model
         'distributed_at' => 'datetime',
     ];
 
+    /**
+     * The "booted" method of the model.
+     */
+    protected static function booted(): void
+    {
+        // Track changes when investment is updated
+        static::updated(function (Investment $investment) {
+            // Dispatch shares updated event
+            if ($investment->wasChanged('shares')) {
+                $oldShares = $investment->getOriginal('shares');
+                event(new \App\Events\InvestmentSharesUpdated(
+                    $investment,
+                    $oldShares ?? 0,
+                    $investment->shares
+                ));
+            }
+
+            // Dispatch merchandise status changed event
+            if ($investment->wasChanged('merchandise_status')) {
+                $oldStatus = $investment->getOriginal('merchandise_status');
+                event(new \App\Events\MerchandiseStatusChanged(
+                    $investment,
+                    $oldStatus ?? 'pending',
+                    $investment->merchandise_status
+                ));
+            }
+
+            // Dispatch distribution status changed event
+            if ($investment->wasChanged('distribution_status')) {
+                $oldStatus = $investment->getOriginal('distribution_status');
+                event(new \App\Events\DistributionStatusChanged(
+                    $investment,
+                    $oldStatus ?? 'pending',
+                    $investment->distribution_status,
+                    $investment->distributed_profit
+                ));
+            }
+        });
+    }
+
     // ---------------------------------------------
     // Relationships
     // ---------------------------------------------
@@ -121,6 +164,15 @@ class Investment extends Model
     public function distributions()
     {
         return $this->hasMany(InvestmentDistribution::class);
+    }
+
+    /**
+     * Get all transactions for this investment
+     * الحصول على جميع المعاملات لهذا الاستثمار
+     */
+    public function transactions()
+    {
+        return $this->hasMany(InvestmentTransaction::class);
     }
 
     // ---------------------------------------------

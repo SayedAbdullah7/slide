@@ -165,6 +165,17 @@ class InvestmentService
             // Update investment record
             $this->updateInvestmentRecord($existingInvestment, $additionalShares, $additionalAmount, $additionalPaymentRequired);
 
+            // Create transaction record for this purchase
+            $this->createInvestmentTransaction(
+                investment: $existingInvestment,
+                investor: $existingInvestment->investor,
+                opportunity: $opportunity,
+                shares: $additionalShares,
+                amount: $additionalAmount,
+                totalPaymentRequired: $additionalPaymentRequired,
+                investmentType: $existingInvestment->investment_type
+            );
+
             // Reserve additional shares
             $opportunity->reserveShares($additionalShares);
 
@@ -215,6 +226,17 @@ class InvestmentService
 
             // Create investment record using factory pattern
             $investment = $this->createInvestmentRecord($investor, $opportunity, $shares, $amount, $totalPaymentRequired, $investmentType);
+
+            // Create transaction record for this purchase
+            $this->createInvestmentTransaction(
+                investment: $investment,
+                investor: $investor,
+                opportunity: $opportunity,
+                shares: $shares,
+                amount: $amount,
+                totalPaymentRequired: $totalPaymentRequired,
+                investmentType: $investmentType
+            );
 
             // Reserve shares
             $opportunity->reserveShares($shares);
@@ -360,6 +382,40 @@ class InvestmentService
         $investment->total_investment += $additionalAmount;
         $investment->total_payment_required += $additionalPaymentRequired;
         $investment->save();
+    }
+
+    /**
+     * Create investment transaction record
+     * إنشاء سجل معاملة استثمار
+     *
+     * @param Investment $investment
+     * @param InvestorProfile $investor
+     * @param InvestmentOpportunity $opportunity
+     * @param int $shares
+     * @param float $amount
+     * @param float $totalPaymentRequired
+     * @param string $investmentType
+     * @return \App\Models\InvestmentTransaction
+     */
+    protected function createInvestmentTransaction(
+        Investment $investment,
+        InvestorProfile $investor,
+        InvestmentOpportunity $opportunity,
+        int $shares,
+        float $amount,
+        float $totalPaymentRequired,
+        string $investmentType
+    ): \App\Models\InvestmentTransaction {
+        return \App\Models\InvestmentTransaction::create([
+            'investment_id' => $investment->id,
+            'investor_id' => $investor->id,
+            'opportunity_id' => $opportunity->id,
+            'shares' => $shares,
+            'share_price' => $opportunity->share_price,
+            'amount' => $amount,
+            'total_payment_required' => $totalPaymentRequired,
+            'investment_type' => $investmentType,
+        ]);
     }
 
     /**
