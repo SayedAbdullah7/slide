@@ -81,7 +81,7 @@ class InvestmentValidationService
         // For existing investments, check total shares (existing + new)
         if ($existingInvestment) {
             $totalShares = $existingInvestment->shares + $shares;
-            if ($maxShares !== null && $totalShares > $maxShares) {
+            if ($totalShares > $maxShares) {
                 throw new InvestmentException(
                     "الحد الأقصى للأسهم المسموح بها هو {$maxShares} سهم. لديك حالياً {$existingInvestment->shares} سهم",
                     400,
@@ -89,13 +89,9 @@ class InvestmentValidationService
                 );
             }
         } else {
-            if ($maxShares !== null && $shares > $maxShares) {
+            if ($shares > $maxShares) {
                 throw InvestmentException::invalidShares($minShares, $maxShares);
             }
-        }
-
-        if ($shares > $opportunity->available_shares) {
-            throw InvestmentException::insufficientShares($opportunity->available_shares);
         }
     }
 
@@ -125,25 +121,22 @@ class InvestmentValidationService
 
     /**
      * Calculate the minimum number of shares allowed
-     * حساب الحد الأدنى من الأسهم المسموح بها
+     * حساب الحد الأدنى من الأسهم المسموح بها (مع مراعاة الأسهم المتاحة)
      */
     protected function calculateMinShares(InvestmentOpportunity $opportunity): int
     {
         if ($opportunity->share_price <= 0) {
             throw new InvestmentException('سعر السهم غير صالح');
         }
-        return max(1, (int) $opportunity->min_investment);
+        return $opportunity->effectiveMinInvestment();
     }
 
     /**
-     * Calculate the maximum number of shares allowed (if set)
-     * حساب الحد الأقصى من الأسهم المسموح بها (إذا تم تعيينها)
+     * Calculate the maximum number of shares allowed
+     * حساب الحد الأقصى من الأسهم المسموح بها (مع مراعاة الأسهم المتاحة)
      */
-    protected function calculateMaxShares(InvestmentOpportunity $opportunity): ?int
+    protected function calculateMaxShares(InvestmentOpportunity $opportunity): int
     {
-        if (!$opportunity->max_investment) {
-            return null;
-        }
-        return (int) $opportunity->max_investment;
+        return $opportunity->effectiveMaxInvestment();
     }
 }

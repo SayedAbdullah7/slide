@@ -302,7 +302,7 @@ class InvestmentService
         // For existing investments, check total shares (existing + new)
         if ($existingInvestment) {
             $totalShares = $existingInvestment->shares + $shares;
-            if ($maxShares !== null && $totalShares > $maxShares) {
+            if ($totalShares > $maxShares) {
                 throw new InvestmentException(
                     "الحد الأقصى للأسهم المسموح بها هو {$maxShares} سهم. لديك حالياً {$existingInvestment->shares} سهم",
                     400,
@@ -310,7 +310,7 @@ class InvestmentService
                 );
             }
         } else {
-            if ($maxShares !== null && $shares > $maxShares) {
+            if ($shares > $maxShares) {
                 throw InvestmentException::invalidShares($minShares, $maxShares);
             }
         }
@@ -449,29 +449,23 @@ class InvestmentService
 
     /**
      * Calculate the minimum number of shares allowed.
-     * حساب الحد الأدنى من الأسهم المسموح بها
+     * حساب الحد الأدنى من الأسهم المسموح بها (مع مراعاة الأسهم المتاحة)
      */
     protected function calculateMinShares(InvestmentOpportunity $opportunity): int
     {
         if ($opportunity->share_price <= 0) {
             throw new InvestmentException('سعر السهم غير صالح'); // Invalid share price
         }
-        // min_investment is now stored as number of shares, not currency
-        return max(1, (int) $opportunity->min_investment);
+        return $opportunity->effectiveMinInvestment();
     }
 
     /**
-     * Calculate the maximum number of shares allowed (if set).
-     * حساب الحد الأقصى من الأسهم المسموح بها (إذا تم تعيينها)
+     * Calculate the maximum number of shares allowed.
+     * حساب الحد الأقصى من الأسهم المسموح بها (مع مراعاة الأسهم المتاحة)
      */
-    protected function calculateMaxShares(InvestmentOpportunity $opportunity): ?int
+    protected function calculateMaxShares(InvestmentOpportunity $opportunity): int
     {
-        if (!$opportunity->max_investment) {
-            return null;
-        }
-
-        // max_investment is now stored as number of shares, not currency
-        return (int) $opportunity->max_investment;
+        return $opportunity->effectiveMaxInvestment();
     }
 
     /**
