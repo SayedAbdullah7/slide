@@ -48,8 +48,8 @@ class InvestmentOpportunityResource extends JsonResource
             'funding_progress_percentage' => $this->completion_rate,
             'is_available_for_investment' => $this->is_fundable,
 
-            'minimum_shares_to_invest' => (string) $this->min_investment,
-            'maximum_shares_to_invest' => (string) $this->max_investment,
+            'minimum_shares_to_invest' => (string) $this->effectiveMinInvestment(),
+            'maximum_shares_to_invest' => (string) $this->effectiveMaxInvestment(),
 
             // Investment type availability
             // 'allowed_investment_types' => $this->allowed_investment_types ?? 'both',

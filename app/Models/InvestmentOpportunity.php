@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
@@ -86,7 +87,7 @@ use Spatie\MediaLibrary\InteractsWithMedia;
 class InvestmentOpportunity extends Model implements HasMedia
 {
 //    use SoftDeletes;
-    use InteractsWithMedia;
+    use HasFactory, InteractsWithMedia;
 
     protected $attributes = [
         'reserved_shares' => 0,
@@ -159,15 +160,53 @@ class InvestmentOpportunity extends Model implements HasMedia
     {
         // Update status when opportunity is updated
         static::updated(function (InvestmentOpportunity $opportunity) {
+            $oldStatus = $opportunity->getOriginal('status');
+            $oldReservedShares = $opportunity->getOriginal('reserved_shares');
+
             // Only update if relevant fields changed
             if ($opportunity->wasChanged(['show', 'show_date', 'offering_start_date', 'offering_end_date', 'reserved_shares'])) {
                 $opportunity->updateDynamicStatus();
+
+                // // Dispatch status changed event if status changed
+                // if ($opportunity->wasChanged('status') && $oldStatus !== $opportunity->status) {
+                //     event(new \App\Events\InvestmentOpportunityStatusChanged(
+                //         $opportunity,
+                //         $oldStatus ?? 'draft',
+                //         $opportunity->status,
+                //         $opportunity->getChanges()
+                //     ));
+                // }
+
+                // // Dispatch reserved shares updated event if reserved_shares changed
+                // if ($opportunity->wasChanged('reserved_shares') && $oldReservedShares !== $opportunity->reserved_shares) {
+                //     event(new \App\Events\ReservedSharesUpdated(
+                //         $opportunity,
+                //         $oldReservedShares ?? 0,
+                //         $opportunity->reserved_shares
+                //     ));
+                // }
 
                 // Check and process reminders if opportunity became available
                 if ($opportunity->wasChanged(['status', 'offering_start_date']) && $opportunity->status === 'open') {
                     $opportunity->processReminders();
                 }
             }
+
+            // Dispatch actual profits recorded event
+            // if ($opportunity->wasChanged(['actual_profit_per_share', 'actual_net_profit_per_share'])) {
+            //     if ($opportunity->actual_profit_per_share !== null && $opportunity->actual_net_profit_per_share !== null) {
+            //         $affectedInvestments = $opportunity->investmentsAuthorize()
+            //             ->whereNotNull('actual_profit_per_share')
+            //             ->count();
+
+            //         event(new \App\Events\ActualProfitsRecorded(
+            //             $opportunity,
+            //             $opportunity->actual_profit_per_share,
+            //             $opportunity->actual_net_profit_per_share,
+            //             $affectedInvestments
+            //         ));
+            //     }
+            // }
         });
 
         // Update status when opportunity is created
@@ -417,6 +456,30 @@ class InvestmentOpportunity extends Model implements HasMedia
         return max(0, $this->total_shares - $this->reserved_shares);
     }
 
+    /**
+     * Get effective minimum shares to invest (capped by available shares)
+     * الحد الأدنى الفعلي للاستثمار (لا يتجاوز الأسهم المتاحة)
+     */
+    public function effectiveMinInvestment(): int
+    {
+        $availableShares = $this->available_shares;
+        $minInvestment = $this->min_investment ?? 1;
+
+        return min($minInvestment, $availableShares);
+    }
+
+    /**
+     * Get effective maximum shares to invest (capped by available shares)
+     * الحد الأقصى الفعلي للاستثمار (لا يتجاوز الأسهم المتاحة)
+     */
+    public function effectiveMaxInvestment(): int
+    {
+        $availableShares = $this->available_shares;
+        $maxInvestment = $this->max_investment ?? $availableShares;
+
+        return min($maxInvestment, $availableShares);
+    }
+
     public function getCompletionRateAttribute(): float
     {
         $totalShares = $this->total_shares;
@@ -451,8 +514,18 @@ class InvestmentOpportunity extends Model implements HasMedia
 
     public function reserveShares(int $shares): void
     {
+        $oldReservedShares = $this->reserved_shares;
         $this->reserved_shares += $shares;
         $this->save();
+
+        // Dispatch event if shares were actually updated
+        if ($oldReservedShares !== $this->reserved_shares) {
+            event(new \App\Events\ReservedSharesUpdated(
+                $this,
+                $oldReservedShares,
+                $this->reserved_shares
+            ));
+        }
     }
 
 
@@ -599,48 +672,42 @@ class InvestmentOpportunity extends Model implements HasMedia
 
     /**
      * Calculate dynamic status based on dates and conditions
+     * حساب الحالة الديناميكية بناءً على التواريخ والشروط
      */
     public function calculateDynamicStatus(): string
     {
         $now = now();
 
-        // If manually set to completed or suspended, keep it
-        if (in_array($this->status, ['completed', 'suspended'])) {
-            return $this->status;
+        // If manually suspended, keep it
+        // لو متوقفة يدوياً، خليها زي ما هي
+        if ($this->status === 'suspended') {
+            return 'suspended';
         }
 
-        // If not shown yet
-        if (!$this->show || !$this->show_date || $this->show_date > $now) {
-            return 'draft';
+        // FIRST: Check if no available shares - immediately completed
+        // أولاً: لو مفيش أسهم متبقية - تبقى مكتملة فوراً بغض النظر عن أي حاجة تانية
+        if ($this->available_shares <= 0) {
+            return 'completed';
         }
 
-        // If offering hasn't started yet
+        // If offering has ended - completed regardless of remaining shares
+        // لو التاريخ انتهى - مكتملة بغض النظر عن الأسهم المتبقية
+        if ($this->offering_end_date && $this->offering_end_date < $now) {
+            return 'completed';
+        }
+
+        // If there are available shares, determine if coming or open
+        // لو في أسهم متبقية، نحدد لو قادمة أو مفتوحة
+
+        // If offering hasn't started yet - coming
+        // لو الطرح لسه ما بدأش - قادمة
         if ($this->offering_start_date && $this->offering_start_date > $now) {
             return 'coming';
         }
 
-        // If offering has ended
-        if ($this->offering_end_date && $this->offering_end_date < $now) {
-            // Check if fully funded
-            if ($this->completion_rate >= 100) {
-                return 'completed';
-            } else {
-                return 'expired';
-            }
-        }
-
-        // If within offering period
-        if ($this->isWithinOfferingWindow()) {
-            // Check if fully funded
-            if ($this->completion_rate >= 100) {
-                return 'completed';
-            } else {
-                return 'open';
-            }
-        }
-
-        // Default to pending if no clear status
-        return 'pending';
+        // Within offering period with available shares - open
+        // في فترة الطرح وفي أسهم متاحة - مفتوحة
+        return 'open';
     }
 
     /**
