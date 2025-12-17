@@ -101,32 +101,32 @@ class Investment extends Model
             // Dispatch shares updated event
             if ($investment->wasChanged('shares')) {
                 $oldShares = $investment->getOriginal('shares');
-                event(new \App\Events\InvestmentSharesUpdated(
-                    $investment,
-                    $oldShares ?? 0,
-                    $investment->shares
-                ));
+                // event(new \App\Events\InvestmentSharesUpdated(
+                //     $investment,
+                //     $oldShares ?? 0,
+                //     $investment->shares
+                // ));
             }
 
             // Dispatch merchandise status changed event
             if ($investment->wasChanged('merchandise_status')) {
                 $oldStatus = $investment->getOriginal('merchandise_status');
-                event(new \App\Events\MerchandiseStatusChanged(
-                    $investment,
-                    $oldStatus ?? 'pending',
-                    $investment->merchandise_status
-                ));
+                // event(new \App\Events\MerchandiseStatusChanged(
+                //     $investment,
+                //     $oldStatus ?? 'pending',
+                //     $investment->merchandise_status
+                // ));
             }
 
             // Dispatch distribution status changed event
             if ($investment->wasChanged('distribution_status')) {
                 $oldStatus = $investment->getOriginal('distribution_status');
-                event(new \App\Events\DistributionStatusChanged(
-                    $investment,
-                    $oldStatus ?? 'pending',
-                    $investment->distribution_status,
-                    $investment->distributed_profit
-                ));
+                // event(new \App\Events\DistributionStatusChanged(
+                //     $investment,
+                //     $oldStatus ?? 'pending',
+                //     $investment->distribution_status,
+                //     $investment->distributed_profit
+                // ));
             }
         });
     }
