@@ -27,6 +27,7 @@ class UpdateInvestmentOpportunityStatus extends Command
     public function handle()
     {
         $this->info('Starting investment opportunity status update...');
+        \Log::info('Starting investment opportunity status update...');
 
         $query = InvestmentOpportunity::query();
 
@@ -48,6 +49,7 @@ class UpdateInvestmentOpportunityStatus extends Command
                 $newStatus = $opportunity->status;
 
                 if ($oldStatus !== $newStatus) {
+                    \Log::info("Updated opportunity '{$opportunity->name}' from '{$oldStatus}' to '{$newStatus}'");
                     $updated++;
                     $this->line("\nUpdated opportunity '{$opportunity->name}' from '{$oldStatus}' to '{$newStatus}'");
                 }
