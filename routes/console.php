@@ -10,3 +10,7 @@ Artisan::command('inspire', function () {
 
 // Schedule status updates every hour
 Schedule::command('opportunities:update-status')->hourly();
+
+Schedule::call(function () {
+    \Log::info('Cron Scheduler is working!');
+})->everyMinute();
