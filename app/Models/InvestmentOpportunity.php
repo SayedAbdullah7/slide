@@ -520,11 +520,11 @@ class InvestmentOpportunity extends Model implements HasMedia
 
         // Dispatch event if shares were actually updated
         if ($oldReservedShares !== $this->reserved_shares) {
-            event(new \App\Events\ReservedSharesUpdated(
-                $this,
-                $oldReservedShares,
-                $this->reserved_shares
-            ));
+            // event(new \App\Events\ReservedSharesUpdated(
+            //     $this,
+            //     $oldReservedShares,
+            //     $this->reserved_shares
+            // ));
         }
     }
 
