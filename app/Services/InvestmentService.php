@@ -171,7 +171,7 @@ class InvestmentService
                 investor: $existingInvestment->investor,
                 opportunity: $opportunity,
                 shares: $additionalShares,
-                amount: $additionalAmount,
+                totalInvestment: $additionalAmount,
                 totalPaymentRequired: $additionalPaymentRequired,
                 investmentType: $existingInvestment->investment_type
             );
@@ -233,7 +233,7 @@ class InvestmentService
                 investor: $investor,
                 opportunity: $opportunity,
                 shares: $shares,
-                amount: $amount,
+                totalInvestment: $amount,
                 totalPaymentRequired: $totalPaymentRequired,
                 investmentType: $investmentType
             );
@@ -392,7 +392,7 @@ class InvestmentService
      * @param InvestorProfile $investor
      * @param InvestmentOpportunity $opportunity
      * @param int $shares
-     * @param float $amount
+     * @param float $totalInvestment
      * @param float $totalPaymentRequired
      * @param string $investmentType
      * @return \App\Models\InvestmentTransaction
@@ -402,7 +402,7 @@ class InvestmentService
         InvestorProfile $investor,
         InvestmentOpportunity $opportunity,
         int $shares,
-        float $amount,
+        float $totalInvestment,
         float $totalPaymentRequired,
         string $investmentType
     ): \App\Models\InvestmentTransaction {
@@ -412,7 +412,7 @@ class InvestmentService
             'opportunity_id' => $opportunity->id,
             'shares' => $shares,
             'share_price' => $opportunity->share_price,
-            'amount' => $amount,
+            'total_investment' => $totalInvestment,
             'total_payment_required' => $totalPaymentRequired,
             'investment_type' => $investmentType,
         ]);
